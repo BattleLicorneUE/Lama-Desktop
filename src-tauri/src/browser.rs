@@ -9,6 +9,7 @@
 //! - la page est revérifiée avant chaque champ rempli (elle a pu changer entre-temps) ;
 //! - le port de débogage est local, tiré au hasard, et le navigateur est fermé avec Lama.
 
+use crate::sync::MutexExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex as StdMutex;
@@ -97,11 +98,11 @@ static PID: AtomicU32 = AtomicU32::new(0);
 
 /// Dossier du profil du navigateur (dans le profil de l'utilisateur).
 pub fn set_dir(dir: Option<&Path>) {
-    *DIR.lock().unwrap() = dir.map(|d| d.join("browser"));
+    *DIR.lock_safe() = dir.map(|d| d.join("browser"));
 }
 
 fn profile_dir() -> Result<PathBuf, String> {
-    DIR.lock().unwrap().clone().ok_or_else(|| "Aucun profil ouvert.".to_string())
+    DIR.lock_safe().clone().ok_or_else(|| "Aucun profil ouvert.".to_string())
 }
 
 /// Ferme le navigateur sans attendre (sortie de l'application, effacement des données).
@@ -583,7 +584,7 @@ mod tests {
                     let page = if first.starts_with("POST") {
                         let pairs: Vec<(String, String)> = reqwest::Url::parse(&format!("http://x/?{body}")).unwrap().query_pairs().map(|(k, v)| (k.to_string(), v.to_string())).collect();
                         let who = pairs.iter().find(|(k, _)| k == "email").map(|(_, v)| v.clone()).unwrap_or_default();
-                        posts.lock().unwrap().push(pairs);
+                        posts.lock_safe().push(pairs);
                         format!("<title>Connecté</title><h1>Bienvenue {who}</h1>")
                     } else if first.contains("/step1") {
                         // Étape 1 : l'identifiant ; l'étape 2 (mot de passe) arrive après un délai, sans changer d'adresse.
@@ -622,7 +623,7 @@ mod tests {
         println!("{msg}");
         assert!(!msg.contains("P@ss") && !msg.contains(secret), "le résultat ne doit contenir aucun secret");
         {
-            let got = posts.lock().unwrap();
+            let got = posts.lock_safe();
             assert_eq!(got.len(), 1, "un seul envoi");
             assert_eq!(got[0], vec![("email".to_string(), "jean.dupont@example.org".to_string()), ("password".to_string(), secret.to_string())], "valeurs exactes, caractères spéciaux compris, dans le bon champ");
         }
@@ -633,7 +634,7 @@ mod tests {
         let msg = login(&entry, u, p, true).await.unwrap();
         println!("{msg}");
         {
-            let got = posts.lock().unwrap();
+            let got = posts.lock_safe();
             assert_eq!(got.len(), 2);
             assert_eq!(got[1][0], ("email".to_string(), "jean.dupont@example.org".to_string()));
             assert_eq!(got[1][1], ("password".to_string(), secret.to_string()));
@@ -644,7 +645,7 @@ mod tests {
         let (u, p) = creds();
         let msg = login(&entry, u, p, false).await.unwrap();
         assert!(msg.contains("Rien n'a été validé"), "{msg}");
-        assert_eq!(posts.lock().unwrap().len(), 2);
+        assert_eq!(posts.lock_safe().len(), 2);
 
         // 4. Mauvais site : même serveur mais autre nom d'hôte (127.0.0.1 au lieu de localhost) → refus, aucun envoi.
         open(&format!("http://127.0.0.1:{port}/login")).await.unwrap();
@@ -652,7 +653,7 @@ mod tests {
         let err = login(&entry, u, p, true).await.unwrap_err();
         println!("{err}");
         assert!(err.contains("ne correspond pas"), "{err}");
-        assert_eq!(posts.lock().unwrap().len(), 2, "rien n'a été saisi ni envoyé sur le faux site");
+        assert_eq!(posts.lock_safe().len(), 2, "rien n'a été saisi ni envoyé sur le faux site");
 
         // 5. Lecture de la page et clic par numéro.
         open(&format!("{entry}/login")).await.unwrap();

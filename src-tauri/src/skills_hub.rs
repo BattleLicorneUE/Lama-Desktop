@@ -12,7 +12,7 @@ use futures_util::StreamExt;
 use regex::Regex;
 use serde::Serialize;
 
-const UA: &str = "LamaDesktop/0.1 (+skills)";
+const UA: &str = concat!("LamaDesktop/", env!("CARGO_PKG_VERSION"), " (+skills)");
 const MAX_ARCHIVE: usize = 80_000_000;
 const MAX_UNPACKED: u64 = 250_000_000;
 const MAX_FILES: usize = 20_000;

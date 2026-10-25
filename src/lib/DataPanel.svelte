@@ -44,7 +44,10 @@
       if (typeof path !== "string") return null;
       const ok = await askConfirm("Remplacer les conversations, projets, mémoire et réglages de ce profil par ceux de la sauvegarde ? Ta base actuelle est gardée à côté (history-avant-restauration.db).", "Restaurer");
       if (!ok) return null;
-      await invoke("data_restore", { path });
+      // Les serveurs MCP lancent des programmes : on ne les restaure que si tu les as lus et acceptés.
+      const servers = await invoke<string[]>("data_restore_preview", { path });
+      const withMcp = servers.length > 0 && (await askConfirm(`Cette sauvegarde contient des serveurs MCP, qui lancent des programmes sur ton ordinateur :\n\n${servers.join("\n")}\n\nLes restaurer aussi ? Ne le fais que si tu as créé cette sauvegarde toi-même.`, "Restaurer les serveurs"));
+      await invoke("data_restore", { path, withMcp });
       location.reload();
       return "Sauvegarde restaurée, rechargement…";
     });
