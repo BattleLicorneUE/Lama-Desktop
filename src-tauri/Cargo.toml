@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.2.1"
+version = "0.3.0"
 description = "Poste de travail de bureau pour les modèles Ollama Cloud"
 authors = ["BattleLicorneUE"]
 license = "MIT"

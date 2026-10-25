@@ -4,7 +4,19 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), ver
 
 ## [Non publié]
 
+## [0.3.0] - 2026-10-26
+
 ### Ajouté
+- **Modèles locaux** (sans Ollama) : installation et suppression de modèles du catalogue depuis Réglages → Système, avec le moteur llama.cpp (Vulkan ou processeur) téléchargé par l'application. Téléchargements repris et vérifiés par SHA-256, un modèle chargé à la fois et déchargé après 15 minutes sans utilisation.
+- **Détection du PC** (mémoire, carte graphique, processeur, disque) et recommandation des modèles adaptés (rapide, mixte, processeur, trop lourd).
+- **Contexte réglable** pour les modèles locaux : automatique jusqu'à 32 000 jetons selon la carte graphique, jusqu'à 128 000 pour les modèles qui le permettent, cache compressé en 8 bits au-delà de 8 000 jetons.
+- Recherche web : Wikipédia en secours quand DuckDuckGo ne répond pas.
+
+### Modifié
+- **La recherche web utilise DuckDuckGo pour tous les modèles** et reste active tant que l'ordinateur est en ligne ; l'API web d'Ollama est supprimée. Le bouton marche/arrêt devient un indicateur de connexion.
+- La clé API Ollama ne sert plus qu'aux modèles cloud.
+
+### Documentation
 - Documentation du dépôt : `CONTRIBUTING.md`, `SECURITY.md`, `docs/ARCHITECTURE.md`, modèles d'issues et de pull requests.
 - `.editorconfig` et `.gitattributes` pour des fins de ligne et un style homogènes.
 
