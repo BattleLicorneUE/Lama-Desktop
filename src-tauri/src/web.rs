@@ -212,15 +212,23 @@ fn format_hits(hits: &[Hit]) -> String {
         .join("\n")
 }
 
+/// Internet répond-il ? On interroge l'adresse que Windows utilise lui-même pour savoir s'il est en ligne : elle ne dépend ni de
+/// DuckDuckGo (qui peut être lent ou bloqué sans que l'ordinateur soit hors ligne) ni d'un site tiers de plus.
+pub async fn online() -> bool {
+    let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_secs(4)).build() else { return false };
+    client.get("http://www.msftconnecttest.com/connecttest.txt").send().await.map(|r| r.status().is_success()).unwrap_or(false)
+}
+
 /// Recherche web via DuckDuckGo (sans compte ni clé).
 pub async fn search(query: &str) -> Result<String, String> {
     let client = http()?;
     let resp = client
         .get("https://html.duckduckgo.com/html/")
         .query(&[("q", query)])
+        .timeout(Duration::from_secs(10))
         .send()
         .await
-        .map_err(|e| format!("Recherche échouée : {e}"))?;
+        .map_err(|e| if e.is_timeout() { "DuckDuckGo ne répond pas (délai de 10 s dépassé). Le site est peut-être bloqué ou surchargé : réessaie plus tard.".to_string() } else { format!("Recherche échouée : {e}") })?;
     if !resp.status().is_success() {
         return Err(format!("DuckDuckGo a répondu {}", resp.status()));
     }
@@ -278,6 +286,16 @@ mod tests {
         let page = fetch("https://example.com").await.unwrap();
         println!("--- PAGE ---\n{page}");
         assert!(page.contains("Example Domain"), "contenu inattendu : {page}");
+    }
+
+    /// Test réseau : la vérification de la commande `net_online` (cargo test live_internet -- --ignored).
+    #[tokio::test]
+    #[ignore]
+    async fn live_internet_is_reachable() {
+        let t = std::time::Instant::now();
+        let ok = online().await;
+        println!("joignable : {ok} en {:?}", t.elapsed());
+        assert!(ok);
     }
 
     #[test]

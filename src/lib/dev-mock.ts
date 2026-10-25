@@ -368,6 +368,8 @@ export function installMock() {
         return null;
       case "hardware_detect":
         return { ram_mb: 24260, ram_free_mb: 14811, cpu: "AMD Ryzen 7 7435HS", cores: 16, avx2: true, disk_free_mb: 69919, gpus: [{ name: "NVIDIA GeForce RTX 4060 Laptop GPU", vendor: "nvidia", vram_mb: 8188, integrated: false }] };
+      case "net_online":
+        return true;
       case "local_installed":
         return localInstalled;
       case "local_status":

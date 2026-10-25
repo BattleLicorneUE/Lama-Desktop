@@ -396,7 +396,28 @@ export class ChatStore {
   /** Mémoire du projet ouvert (page projet). */
   projectMemories = $state<Memory[]>([]);
   /** Recherche web (outils web_search / web_fetch) activée pour l'agent. */
-  webSearch = $state(load("web", "1") === "1");
+  online = $state(true);
+  private onlineAt = 0;
+  /** La recherche web (DuckDuckGo) est toujours active, sauf quand l'ordinateur est hors ligne. */
+  get webSearch() {
+    return this.online;
+  }
+
+  /** Vérifie qu'internet répond (au plus une fois toutes les 30 s, sauf si `force`). */
+  async checkOnline(force = false): Promise<boolean> {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      this.online = false;
+      return false;
+    }
+    if (!force && Date.now() - this.onlineAt < 30_000) return this.online;
+    try {
+      this.online = await invoke<boolean>("net_online");
+    } catch {
+      this.online = true; // en cas de doute, on laisse l'agent essayer ; l'outil affichera l'erreur
+    }
+    this.onlineAt = Date.now();
+    return this.online;
+  }
   /** Clé API d'Ollama Cloud (modèles cloud). Nom historique : `webKey`. */
   webKey = $state("");
   /** Modèle utilisé en mode Plan (vide = le modèle courant). */
@@ -588,11 +609,6 @@ export class ChatStore {
     this.theme = t;
     save("theme", t);
     this.applyTheme();
-  }
-
-  setWebSearch(v: boolean) {
-    this.webSearch = v;
-    save("web", v ? "1" : "0");
   }
 
   setWebKey(v: string) {
@@ -1237,6 +1253,11 @@ export class ChatStore {
     this.applyTheme();
     this.loadCloud();
     this.loadLocal();
+    const goOffline = () => (this.online = false);
+    const goOnline = () => void this.checkOnline(true);
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+    void this.checkOnline(true);
     this.loadProjects();
     this.loadConvs();
     this.loadSkills().then(() => this.autoImportSkills());
@@ -1374,6 +1395,8 @@ export class ChatStore {
       }),
     ]);
     return () => {
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online", goOnline);
       unsubs.then((fns) => fns.forEach((f) => f()));
     };
   }
@@ -1825,7 +1848,7 @@ export class ChatStore {
         ...base,
         workspace: this.mode === "code" ? this.workspace.trim() : null,
         mode: this.permission,
-        web: this.webSearch || deep,
+        web: await this.checkOnline(),
         attachments: attachmentsForTool($state.snapshot(s.messages)),
         docs: indexed.length ? indexed : null,
         projectId: project?.id ?? null,

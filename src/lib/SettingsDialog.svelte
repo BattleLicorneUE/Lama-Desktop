@@ -232,11 +232,9 @@
     <p class="muted ctxnote bad">{chat.cloudError}</p>
   {/if}
   <p class="muted">La clé est rangée dans le coffre Windows de ce profil et n'est envoyée qu'à ollama.com.</p>
-  <label class="check">
-    <input type="checkbox" checked={chat.webSearch} onchange={(e) => chat.setWebSearch(e.currentTarget.checked)} />
-    Autoriser le modèle à chercher sur le web avec DuckDuckGo (bouton globe de la zone de saisie)
-  </label>
-  <p class="muted">DuckDuckGo n'a pas d'API officielle : si le site bloque les requêtes de l'application, la recherche affiche une erreur claire. En mode Manuel, chaque page lue demande ton accord ; les adresses locales sont refusées.</p>
+  <p class="muted">
+    Recherche web : toujours active avec tous les modèles (cloud et locaux), via DuckDuckGo. Elle se désactive toute seule quand l'ordinateur est hors ligne
+    {#if !chat.online}(<b>c'est le cas en ce moment</b>){/if}. DuckDuckGo n'a pas d'API officielle : si le site bloque les requêtes de l'application, la recherche affiche une erreur claire. En mode Manuel, chaque page lue demande ton accord ; les adresses locales sont refusées.</p>
 </section>
       {:else if tab === "profile"}
         {#key chat.onboardVersion}<MyProfilePanel {chat} defaultName={profileName} />{/key}

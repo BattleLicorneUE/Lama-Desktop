@@ -175,10 +175,10 @@
       ><Icon name="search" size={17} /></button>
       <button
         class="tool"
-        class:on={chat.webSearch}
-        title={chat.webSearch ? "Recherche web activée" : "Activer la recherche web"}
-        aria-pressed={chat.webSearch}
-        onclick={() => chat.setWebSearch(!chat.webSearch)}
+        class:on={chat.online}
+        title={chat.online ? "Recherche web active (DuckDuckGo). Elle se désactive toute seule si l'ordinateur est hors ligne." : "Hors ligne : la recherche web est indisponible. Clique pour revérifier la connexion."}
+        aria-label={chat.online ? "Recherche web active" : "Hors ligne"}
+        onclick={() => chat.checkOnline(true)}
       ><Icon name="globe" size={17} /></button>
       <Menu title="Mode" icon="shield" items={PERMISSION_MODES} value={chat.permission} onselect={(id) => chat.setPermission(id)} />
       {#if chat.mode === "code"}
