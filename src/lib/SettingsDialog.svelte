@@ -17,6 +17,7 @@
   import ProgressPanel from "$lib/ProgressPanel.svelte";
   import VaultPanel from "$lib/VaultPanel.svelte";
   import UpdatePanel from "$lib/UpdatePanel.svelte";
+  import HardwarePanel from "$lib/HardwarePanel.svelte";
 
   let { chat, profileName, onclose }: { chat: ChatStore; profileName: string; onclose: () => void } = $props();
 
@@ -294,6 +295,7 @@
         <UpdatePanel {chat} />
       {:else if tab === "system"}
         <ComputerPanel />
+        <HardwarePanel />
       {:else if tab === "developer"}
         <section>
   <p class="muted">
