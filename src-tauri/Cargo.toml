@@ -40,7 +40,7 @@ base64 = "0.22"
 trash = "5"
 sha2 = "0.10"
 keyring = { version = "3", features = ["windows-native"] }
-pdf-extract = "0.7"
+pdf-extract = "0.12"
 printpdf = { version = "0.7", default-features = false }
 ttf-parser = "0.24"
 pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
