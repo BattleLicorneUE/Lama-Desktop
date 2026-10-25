@@ -234,7 +234,7 @@
   <p class="muted">La clé est rangée dans le coffre Windows de ce profil et n'est envoyée qu'à ollama.com.</p>
   <p class="muted">
     Recherche web : toujours active avec tous les modèles (cloud et locaux), via DuckDuckGo. Elle se désactive toute seule quand l'ordinateur est hors ligne
-    {#if !chat.online}(<b>c'est le cas en ce moment</b>){/if}. DuckDuckGo n'a pas d'API officielle : si le site bloque les requêtes de l'application, la recherche affiche une erreur claire. En mode Manuel, chaque page lue demande ton accord ; les adresses locales sont refusées.</p>
+    {#if !chat.online}(<b>c'est le cas en ce moment</b>){/if}. DuckDuckGo n'a pas d'API officielle : s'il ne répond pas ou bloque l'application, la recherche se rabat sur Wikipédia (et le dit au modèle), faute de mieux. En mode Manuel, chaque page lue demande ton accord ; les adresses locales sont refusées.</p>
 </section>
       {:else if tab === "profile"}
         {#key chat.onboardVersion}<MyProfilePanel {chat} defaultName={profileName} />{/key}

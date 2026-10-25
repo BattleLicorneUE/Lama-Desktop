@@ -7,6 +7,8 @@ use std::time::Duration;
 use regex::Regex;
 
 
+use serde_json::Value;
+
 const UA: &str = concat!("Mozilla/5.0 (Windows NT 10.0; Win64; x64) LamaDesktop/", env!("CARGO_PKG_VERSION"));
 const MAX_PAGE_BYTES: usize = 2_000_000;
 const MAX_TEXT: usize = 15_000;
@@ -46,8 +48,16 @@ fn percent_decode(s: &str) -> String {
 }
 
 fn decode_entities(s: &str) -> String {
-    s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
-        .replace("&#x27;", "'").replace("&#39;", "'").replace("&nbsp;", " ")
+    // Les entités numériques (&#039;, &#x27;, &#233;…) d'abord ; « &amp; » en dernier pour ne pas décoder deux fois.
+    let s = re!(r"&#(x[0-9a-fA-F]+|[0-9]+);").replace_all(s, |c: &regex::Captures| {
+        let n = &c[1];
+        let code = match n.strip_prefix('x') {
+            Some(h) => u32::from_str_radix(h, 16).ok(),
+            None => n.parse().ok(),
+        };
+        code.and_then(char::from_u32).map(String::from).unwrap_or_else(|| c[0].to_string())
+    });
+    s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&nbsp;", " ").replace("&amp;", "&")
 }
 
 /// HTML -> texte lisible (sans scripts, styles ni balises).
@@ -219,8 +229,60 @@ pub async fn online() -> bool {
     client.get("http://www.msftconnecttest.com/connecttest.txt").send().await.map(|r| r.status().is_success()).unwrap_or(false)
 }
 
-/// Recherche web via DuckDuckGo (sans compte ni clé).
+/// Résultats de l'API officielle de Wikipédia (sans clé) : un secours étroit mais fiable quand DuckDuckGo ne répond pas.
+pub fn parse_wikipedia(json: &Value, lang: &str) -> Vec<Hit> {
+    json["query"]["search"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|r| {
+            let title = r["title"].as_str()?.to_string();
+            let mut url = reqwest::Url::parse(&format!("https://{lang}.wikipedia.org/wiki/")).ok()?;
+            url.path_segments_mut().ok()?.pop_if_empty().push(&title.replace(' ', "_"));
+            Some(Hit { title: format!("{title} — Wikipédia"), url: url.to_string(), snippet: html_to_text(r["snippet"].as_str().unwrap_or("")) })
+        })
+        .collect()
+}
+
+async fn wikipedia(query: &str) -> Result<Vec<Hit>, String> {
+    // Wikimédia demande un User-Agent qui dit qui parle.
+    let client = reqwest::Client::builder()
+        .user_agent(concat!("LamaDesktop/", env!("CARGO_PKG_VERSION"), " (https://github.com/BattleLicorneUE/Lama-Desktop)"))
+        .timeout(Duration::from_secs(8))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let mut hits = Vec::new();
+    for lang in ["fr", "en"] {
+        let resp = client
+            .get(format!("https://{lang}.wikipedia.org/w/api.php"))
+            .query(&[("action", "query"), ("list", "search"), ("srsearch", query), ("srlimit", "5"), ("format", "json"), ("utf8", "1")])
+            .send()
+            .await
+            .map_err(|e| format!("Wikipédia injoignable : {e}"))?;
+        if !resp.status().is_success() {
+            return Err(format!("Wikipédia a répondu {}", resp.status()));
+        }
+        hits.extend(parse_wikipedia(&resp.json().await.map_err(|e| e.to_string())?, lang));
+        if hits.len() >= 3 {
+            break;
+        }
+    }
+    Ok(hits)
+}
+
+/// Recherche web : DuckDuckGo (sans compte ni clé) ; s'il ne répond pas ou refuse, Wikipédia en secours, en le disant.
 pub async fn search(query: &str) -> Result<String, String> {
+    match duckduckgo(query).await {
+        Ok(out) => Ok(out),
+        Err(ddg_error) => match wikipedia(query).await {
+            Ok(hits) if !hits.is_empty() => Ok(format!("(DuckDuckGo n'a pas répondu : {ddg_error} Voici seulement des résultats de Wikipédia, à prendre comme tels : une encyclopédie ne couvre pas l'actualité ni le détail technique.)
+{}", format_hits(&hits[..hits.len().min(8)]))),
+            _ => Err(ddg_error),
+        },
+    }
+}
+
+async fn duckduckgo(query: &str) -> Result<String, String> {
     let client = http()?;
     let resp = client
         .get("https://html.duckduckgo.com/html/")
@@ -244,11 +306,18 @@ pub async fn search(query: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn html_to_text_strips_markup() {
         let t = html_to_text("<html><head><title>x</title></head><body><script>bad()</script><h1>Titre</h1><p>Un &amp; deux</p></body></html>");
         assert_eq!(t, "Titre\n\nUn & deux");
+    }
+
+    #[test]
+    fn decodes_numeric_entities_once() {
+        assert_eq!(decode_entities("l&#039;accent &#233;t&#xE9; &amp;lt;b&amp;gt;"), "l'accent été &lt;b&gt;");
+        assert_eq!(decode_entities("&#99999999999;"), "&#99999999999;");
     }
 
     #[test]
@@ -263,6 +332,38 @@ mod tests {
         assert!(ddg_blocked(202, ""));
         assert!(ddg_blocked(200, "<div class=\"anomaly-modal\">Unfortunately, bots use DuckDuckGo too.</div>"));
         assert!(!ddg_blocked(200, "<div class=\"no-results\">Aucun résultat</div>"));
+    }
+
+    #[test]
+    fn parses_wikipedia_results() {
+        let json: Value = serde_json::from_str(r#"{"query":{"search":[{"title":"Rust (langage)","snippet":"Pour les <span class=\"searchmatch\">Rust</span> et Mozilla"},{"title":"Café","snippet":""}]}}"#).unwrap();
+        let hits = parse_wikipedia(&json, "fr");
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].url, "https://fr.wikipedia.org/wiki/Rust_(langage)");
+        assert_eq!(hits[0].title, "Rust (langage) — Wikipédia");
+        assert_eq!(hits[0].snippet, "Pour les Rust et Mozilla");
+        assert_eq!(hits[1].url, "https://fr.wikipedia.org/wiki/Caf%C3%A9", "les accents sont encodés");
+        assert!(parse_wikipedia(&json!({}), "fr").is_empty());
+    }
+
+    /// Test réseau : le secours Wikipédia (cargo test live_wikipedia -- --ignored --nocapture).
+    /// Test réseau : la recherche complète, avec secours si DuckDuckGo ne répond pas.
+    #[tokio::test]
+    #[ignore]
+    async fn live_search_with_fallback() {
+        let out = search("langage de programmation rust").await.unwrap();
+        println!("{out}");
+        assert!(out.contains("https://"), "{out}");
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn live_wikipedia_fallback() {
+        let hits = wikipedia("langage de programmation rust").await.unwrap();
+        for h in &hits {
+            println!("{} | {} | {}", h.title, h.url, h.snippet);
+        }
+        assert!(!hits.is_empty() && hits[0].url.starts_with("https://fr.wikipedia.org/wiki/"));
     }
 
     #[test]
