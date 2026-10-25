@@ -16,6 +16,8 @@
   import { collectArtifacts } from "$lib/artifacts";
   import TasksPage from "$lib/TasksPage.svelte";
   import Celebrate from "$lib/Celebrate.svelte";
+  import UpdateToast from "$lib/UpdateToast.svelte";
+  import { updater } from "$lib/updater.svelte";
   import ModelsDialog from "$lib/ModelsDialog.svelte";
   import TemplateDialog from "$lib/TemplateDialog.svelte";
   import ApprovalDialog from "$lib/ApprovalDialog.svelte";
@@ -42,6 +44,9 @@
 
   onMount(() => {
     const stops = [chat.init()];
+    // Vérification discrète, un peu après le lancement pour ne pas ralentir le démarrage.
+    const later = setTimeout(() => void updater.check(true), 8000);
+    stops.push(() => clearTimeout(later));
     const drop = getCurrentWebview().onDragDropEvent((e) => {
       const p = e.payload;
       if (p.type === "enter" || p.type === "over") dragging = true;
@@ -217,6 +222,7 @@
 {/if}
 {#if showModels}<ModelsDialog {chat} onclose={() => (showModels = false)} />{/if}
 <Celebrate {chat} />
+<UpdateToast onopen={() => { chat.settingsTab = "update"; showSettings = true; }} />
 {#if showSettings}<SettingsDialog {chat} profileName={profile.name} onclose={() => (showSettings = false)} />{/if}
 
 <style>
