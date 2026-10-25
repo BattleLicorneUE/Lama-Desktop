@@ -1,3 +1,5 @@
+mod openai;
+
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -67,6 +69,8 @@ pub struct OllamaClient {
     host: String,
     /// Attentes successives avant de réessayer quand l'API répond « trop de requêtes » (429) ou « indisponible » (503).
     backoff: Vec<std::time::Duration>,
+    /// Moteur local (`llama-server`, API compatible OpenAI) au lieu d'Ollama.
+    openai: bool,
 }
 
 fn default_backoff() -> Vec<std::time::Duration> {
@@ -89,13 +93,30 @@ impl OllamaClient {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, value);
         let http = reqwest::Client::builder().default_headers(headers).build().map_err(|e| e.to_string())?;
-        Ok(Self { http, host: CLOUD_HOST.into(), backoff: default_backoff() })
+        Ok(Self { http, host: CLOUD_HOST.into(), backoff: default_backoff(), openai: false })
     }
 
     /// Client sans authentification vers un serveur de test local.
     #[cfg(test)]
     pub fn for_test(host: impl Into<String>) -> Self {
-        Self { http: reqwest::Client::new(), host: host.into(), backoff: vec![std::time::Duration::from_millis(5); 2] }
+        Self { http: reqwest::Client::new(), host: host.into(), backoff: vec![std::time::Duration::from_millis(5); 2], openai: false }
+    }
+
+    /// Client du moteur local : il n'écoute que sur 127.0.0.1 et exige la clé tirée au lancement.
+    pub fn local(port: u16, api_key: &str) -> Result<Self, String> {
+        use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+        let mut value = HeaderValue::from_str(&format!("Bearer {api_key}")).map_err(|_| "clé locale invalide".to_string())?;
+        value.set_sensitive(true);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, value);
+        // Pas de délai global : un gros modèle sur processeur peut mettre longtemps à répondre.
+        let http = reqwest::Client::builder().default_headers(headers).no_proxy().build().map_err(|e| e.to_string())?;
+        Ok(Self { http, host: format!("http://127.0.0.1:{port}"), backoff: vec![], openai: true })
+    }
+
+    #[cfg(test)]
+    pub fn local_for_test(host: impl Into<String>) -> Self {
+        Self { http: reqwest::Client::new(), host: host.into(), backoff: vec![], openai: true }
     }
 
     fn url(&self, path: &str) -> String {
@@ -124,6 +145,9 @@ impl OllamaClient {
     where
         F: FnMut(ChatChunk),
     {
+        if self.openai {
+            return self.chat_stream_openai(model, messages, tools, options, on_chunk).await;
+        }
         let mut body = serde_json::json!({ "model": model, "messages": messages, "stream": true });
         // `think` n'est pas une option du modèle mais un paramètre de la requête : l'interface le glisse dans les options.
         let (think, options) = split_think(options);
@@ -173,6 +197,45 @@ impl OllamaClient {
 }
 
 impl OllamaClient {
+    /// Même contrat que `chat_stream`, mais vers l'API `/v1/chat/completions` du moteur local.
+    async fn chat_stream_openai<F>(&self, model: &str, messages: &[ChatMessage], tools: Option<Vec<Value>>, options: Option<Value>, mut on_chunk: F) -> Result<(), OllamaError>
+    where
+        F: FnMut(ChatChunk),
+    {
+        let mut body = serde_json::json!({ "model": model, "messages": openai::to_messages(messages), "stream": true, "stream_options": { "include_usage": true } });
+        let (think, options) = split_think(options);
+        openai::apply_options(&mut body, think, options);
+        if let Some(t) = tools.filter(|t| !t.is_empty()) {
+            body["tools"] = Value::Array(t);
+        }
+        let resp = self.http.post(self.url("/v1/chat/completions")).json(&body).send().await?;
+        let status = resp.status();
+        if !status.is_success() {
+            return Err(OllamaError::Status(status.as_u16(), resp.text().await.unwrap_or_default()));
+        }
+        let mut stream = resp.bytes_stream();
+        let mut buf: Vec<u8> = Vec::new();
+        let mut state = openai::Stream::default();
+        while let Some(bytes) = stream.next().await {
+            buf.extend_from_slice(&bytes?);
+            while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+                let line: Vec<u8> = buf.drain(..=pos).collect();
+                if let Some(chunk) = state.feed(&String::from_utf8_lossy(&line))? {
+                    on_chunk(chunk);
+                }
+            }
+        }
+        if !buf.is_empty() {
+            if let Some(chunk) = state.feed(&String::from_utf8_lossy(&buf))? {
+                on_chunk(chunk);
+            }
+        }
+        if !state.is_finished() {
+            on_chunk(state.finish());
+        }
+        Ok(())
+    }
+
     pub async fn show_model(&self, name: &str) -> Result<Value, OllamaError> {
         let resp = self
             .http

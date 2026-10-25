@@ -22,6 +22,7 @@ mod secrets;
 mod system;
 mod hardware;
 mod localmodels;
+mod localai;
 mod templates;
 mod ollama;
 mod skills;
@@ -115,6 +116,68 @@ fn client_for(api_key: &str) -> Result<OllamaClient, OllamaError> {
     OllamaClient::cloud(key).map_err(|e| OllamaError::Status(400, e))
 }
 
+/// Client pour un modèle : « local:<id> » passe par le moteur installé sur le PC (lancé au besoin), le reste par Ollama Cloud.
+async fn client_for_model(app: &AppHandle, api_key: &str, model: &str) -> Result<OllamaClient, OllamaError> {
+    let Some(id) = model.strip_prefix("local:") else { return client_for(api_key) };
+    let data = app_root(app).map_err(|e| OllamaError::Status(500, e))?;
+    let (port, key) = localai::ensure_running(&data, id).await.map_err(|e| OllamaError::Status(500, e))?;
+    localai::touch().await;
+    OllamaClient::local(port, &key).map_err(|e| OllamaError::Status(500, e))
+}
+
+/// Modèles locaux installés sur ce PC.
+#[tauri::command]
+fn local_installed(app: AppHandle) -> Result<Vec<localai::Installed>, String> {
+    Ok(localai::installed(&app_root(&app)?))
+}
+
+#[derive(serde::Serialize)]
+struct LocalStatus {
+    running: Option<String>,
+    installing: Option<String>,
+    engine_bytes: u64,
+}
+
+#[tauri::command]
+async fn local_status(app: AppHandle) -> Result<LocalStatus, String> {
+    Ok(LocalStatus { running: localai::running_model().await, installing: localai::installing(), engine_bytes: localai::engine_bytes(&app_root(&app)?) })
+}
+
+/// Lance l'installation d'un modèle du catalogue : la progression arrive par `local:progress`, la fin par `local:done` ou `local:error`.
+#[tauri::command]
+async fn local_install(app: AppHandle, id: String) -> Result<(), String> {
+    let model = localmodels::catalog().into_iter().find(|m| m.id == id).ok_or("Modèle inconnu.")?;
+    if let Some(other) = localai::installing() {
+        return Err(format!("Une installation est déjà en cours ({other})."));
+    }
+    let data = app_root(&app)?;
+    tokio::spawn(async move {
+        let hw = tokio::task::spawn_blocking(hardware::detect).await.ok();
+        let outcome = match hw {
+            Some(hw) => {
+                let a = app.clone();
+                localai::install(&data, &model, &hw, std::sync::Arc::new(move |p| { let _ = a.emit("local:progress", p); })).await
+            }
+            None => Err("Analyse du PC impossible.".to_string()),
+        };
+        match outcome {
+            Ok(()) => { let _ = app.emit("local:done", serde_json::json!({ "id": model.id })); }
+            Err(e) => { let _ = app.emit("local:error", serde_json::json!({ "id": model.id, "error": e })); }
+        }
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn local_cancel(id: String) {
+    localai::cancel(&id);
+}
+
+#[tauri::command]
+async fn local_remove(app: AppHandle, id: String) -> Result<(), String> {
+    localai::remove(&app_root(&app)?, &id).await
+}
+
 /// Catalogue des modèles d'Ollama Cloud. La liste est publique : elle ne prouve pas que la clé est valide.
 #[tauri::command]
 async fn cloud_models(key: String) -> Result<Vec<ModelInfo>, OllamaError> {
@@ -159,7 +222,7 @@ async fn chat_start(
     let handle = tokio::spawn(async move {
         let emit_app = app.clone();
         let rid2 = rid.clone();
-        let client = match client_for(&cloud_key) {
+        let client = match client_for_model(&app, &cloud_key, &model).await {
             Ok(c) => c,
             Err(e) => {
                 let _ = app.emit("chat:error", serde_json::json!({ "id": rid, "error": e.to_string() }));
@@ -238,7 +301,7 @@ async fn agent_start(
         skills.retain(|s| names.iter().any(|n| n.eq_ignore_ascii_case(&s.name)));
     }
     let running = state.running.clone();
-    let ollama = client_for(&cloud_key).map_err(|e| e.to_string())?;
+    let ollama = client_for_model(&app, &cloud_key, &model).await.map_err(|e| e.to_string())?;
     let agent_state = state.agent_of(window.label());
     let hub = state.mcp.lock().await.clone();
     let rid = request_id.clone();
@@ -945,6 +1008,7 @@ async fn data_erase(app: AppHandle, state: State<'_, AppState>, db: Db<'_>, conf
     }
     let _ = appsettings::set_autostart(false);
     *state.profile.lock().map_err(|e| e.to_string())? = None;
+    localai::shutdown().await;
     browser::shutdown().await;
     tokio::task::spawn_blocking(move || backup::erase_contents(&root)).await.map_err(|e| e.to_string())??;
     app.restart()
@@ -1258,13 +1322,14 @@ fn project_doc_delete(db: Db, id: String) -> Result<(), String> {
 /// Réponse complète sans streaming (résumés de compactage).
 #[tauri::command]
 async fn chat_once(
+    app: AppHandle,
     model: String,
     messages: Vec<ChatMessage>,
     options: Option<serde_json::Value>,
     cloud_key: String,
 ) -> Result<String, OllamaError> {
     let mut out = String::new();
-    client_for(&cloud_key)?.chat_stream(&model, &messages, None, options, |c| out.push_str(&c.content)).await?;
+    client_for_model(&app, &cloud_key, &model).await?.chat_stream(&model, &messages, None, options, |c| out.push_str(&c.content)).await?;
     Ok(out)
 }
 
@@ -1715,6 +1780,10 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            // Un moteur local resté en vie après un plantage serait une mémoire perdue.
+            if let Ok(data) = app.path().app_data_dir() {
+                localai::kill_pid_file(&data);
+            }
             std::fs::create_dir_all(app.path().app_data_dir()?)?;
             export::set_app(app.handle().clone());
             {
@@ -1817,7 +1886,7 @@ pub fn run() {
             project_docs, project_doc_add, project_doc_delete,
             chat_once, mcp_add, mcp_add_custom, mcp_import, mcp_remove,
             secret_get, secret_set, save_text, git_status, git_diff, git_commit,
-            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, local_models_assess, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
+            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, local_models_assess, local_installed, local_status, local_install, local_cancel, local_remove, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
             profiles_list, profile_create, profile_update, profile_set_pin, profile_delete, profile_select,
             agents_list, agent_create, agents_import_claude, agents_open_dir,
             model_show, context_report, fs_create, fs_rename, fs_delete,
@@ -1826,10 +1895,13 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app, event| {
-            // Le navigateur de Lama se ferme avec l'application.
+        .run(|app, event| {
+            // Le navigateur et le moteur local se ferment avec l'application.
             if let tauri::RunEvent::Exit = event {
                 browser::kill_now();
+                if let Ok(data) = app.path().app_data_dir() {
+                    localai::kill_now(&data);
+                }
             }
         });
 }

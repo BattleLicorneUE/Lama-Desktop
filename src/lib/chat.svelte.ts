@@ -86,7 +86,14 @@ export type Msg = {
   /** Réponse interrompue déjà reprise : non renvoyée au modèle (la note de reprise la résume). */
   skipWire?: boolean;
 };
-export type Model = { name: string; size: number; remote_host?: string | null };
+export type Model = { name: string; size: number; remote_host?: string | null; /** Nom affiché si différent de `name` (modèles locaux). */ label?: string; local?: boolean };
+
+/** Un modèle installé sur ce PC (moteur local) ; dans la liste des modèles il s'appelle `local:<id>`. */
+export type LocalInstalled = { id: string; name: string; size_bytes: number; tools: boolean; vision: boolean; license: string };
+export type LocalProgress = { id: string; phase: string; file: string; done: number; total: number };
+export const LOCAL_PREFIX = "local:";
+/** Contexte du moteur local (fixé à son lancement). */
+export const LOCAL_CTX = 8192;
 
 /** Modèle proposé tant qu'on n'en a pas choisi un autre : « beam » (gratuit, 1M de contexte, outils) s'il est au catalogue. */
 export const DEFAULT_MODEL = "beam";
@@ -272,6 +279,10 @@ export class ChatStore {
   /** Modèles d'Ollama Cloud accessibles avec la clé API. */
   models = $state<Model[]>([]);
   cloudModels = $state<Model[]>([]);
+  localInstalled = $state<LocalInstalled[]>([]);
+  /** Installation en cours (une seule à la fois) et dernière erreur d'installation. */
+  localProgress = $state<LocalProgress | null>(null);
+  localError = $state("");
   /** État de la connexion à l'API cloud : « ok » seulement après un vrai test authentifié. */
   cloudStatus = $state<"none" | "checking" | "listed" | "ok" | "error">("none");
   cloudError = $state("");
@@ -704,7 +715,8 @@ export class ChatStore {
 
   /** Recompose la liste affichée et garde un modèle valide sélectionné. */
   mergeModels() {
-    this.models = this.cloudModels;
+    const local: Model[] = this.localInstalled.map((m) => ({ name: LOCAL_PREFIX + m.id, size: m.size_bytes, label: `${m.name} (local)`, local: true }));
+    this.models = [...this.cloudModels, ...local];
     if ((!this.model || !this.models.some((m) => m.name === this.model)) && this.models.length) {
       // Au lancement : le modèle choisi la dernière fois, s'il existe encore ; sinon beam, ou à défaut le premier de la liste.
       const saved = load("model", "");
@@ -765,8 +777,50 @@ export class ChatStore {
     this.mergeModels();
   }
 
+  async loadLocal() {
+    try {
+      this.localInstalled = await invoke<LocalInstalled[]>("local_installed");
+    } catch {
+      this.localInstalled = [];
+    }
+    this.mergeModels();
+  }
+
+  async installLocal(id: string) {
+    this.localError = "";
+    this.localProgress = { id, phase: "préparation", file: "", done: 0, total: 0 };
+    try {
+      await invoke("local_install", { id });
+    } catch (e) {
+      this.localError = String(e);
+      this.localProgress = null;
+    }
+  }
+
+  cancelLocal(id: string) {
+    void invoke("local_cancel", { id });
+  }
+
+  async removeLocal(id: string) {
+    try {
+      await invoke("local_remove", { id });
+      if (this.model === LOCAL_PREFIX + id) this.model = "";
+      await this.loadLocal();
+    } catch (e) {
+      this.localError = String(e);
+    }
+  }
+
   async loadCaps(name: string) {
     if (!name || this.caps[name]) return;
+    if (name.startsWith(LOCAL_PREFIX)) {
+      const m = this.localInstalled.find((x) => LOCAL_PREFIX + x.id === name);
+      if (m) {
+        this.caps[name] = ["completion", ...(m.tools ? ["tools"] : []), ...(m.vision ? ["vision"] : [])];
+        this.ctxInfo[name] = { maxCtx: LOCAL_CTX };
+      }
+      return;
+    }
     try {
       const info = await invoke<{ capabilities?: string[]; model_info?: Record<string, unknown> }>("model_show", { name, cloudKey: this.webKey });
       this.caps[name] = info.capabilities ?? [];
@@ -1162,6 +1216,7 @@ export class ChatStore {
   init() {
     this.applyTheme();
     this.loadCloud();
+    this.loadLocal();
     this.loadProjects();
     this.loadConvs();
     this.loadSkills().then(() => this.autoImportSkills());
@@ -1247,6 +1302,15 @@ export class ChatStore {
         // Les événements sont diffusés à toutes les fenêtres : on ne compte que ceux de ses propres requêtes.
         const s = e.payload.id ? this.sess(e.payload.id) : undefined;
         if (s) this.addUsage(e.payload.prompt, e.payload.eval, s.model);
+      }),
+      listen<LocalProgress>("local:progress", (e) => (this.localProgress = e.payload)),
+      listen<{ id: string }>("local:done", async () => {
+        this.localProgress = null;
+        await this.loadLocal();
+      }),
+      listen<{ id: string; error: string }>("local:error", (e) => {
+        this.localProgress = null;
+        this.localError = e.payload.error;
       }),
       listen<ScheduledTask>("schedule:due", (e) => void this.runTask(e.payload)),
       listen<{ id: string; prompt_tokens: number }>("chat:usage", (e) => {

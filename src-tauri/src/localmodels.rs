@@ -18,6 +18,15 @@ const CPU_COMFORT_MB: u64 = 2600;
 const CPU_LIMIT_MB: u64 = 6000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelFile {
+    pub name: String,
+    pub size: u64,
+    pub sha256: String,
+    /// « model » (les poids) ou « projector » (la partie qui lit les images).
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Model {
     pub id: String,
     pub name: String,
@@ -32,6 +41,10 @@ pub struct Model {
     pub tools: bool,
     pub vision: bool,
     pub blurb: String,
+    /// Dépôt Hugging Face d'où viennent les fichiers.
+    pub repo: String,
+    pub license: String,
+    pub files: Vec<ModelFile>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

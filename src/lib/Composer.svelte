@@ -206,7 +206,7 @@
         up
         flat
         value={chat.model}
-        items={chat.chatModels.map((m) => ({ value: m.name, label: m.name }))}
+        items={chat.chatModels.map((m) => ({ value: m.name, label: m.label ?? m.name }))}
         placeholder="Aucun modèle"
         title="Modèle"
         disabled={!chat.models.length || chat.busy}

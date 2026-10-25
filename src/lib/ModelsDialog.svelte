@@ -22,11 +22,12 @@
   let error = $state("");
 
   const shown = $derived(
-    chat.models.filter((m) => m.name.toLowerCase().includes(filter.trim().toLowerCase()) && (!need || chat.caps[m.name]?.includes(need))),
+    chat.models.filter((m) => (m.label ?? m.name).toLowerCase().includes(filter.trim().toLowerCase()) && (!need || chat.caps[m.name]?.includes(need))),
   );
 
   async function show(name: string) {
     error = "";
+    if (name.startsWith("local:")) return; // les détails viennent d'Ollama ; un modèle local se gère dans Réglages → Système
     try {
       info = { name, data: await invoke<Details>("model_show", { name, cloudKey: chat.webKey }) };
     } catch (e) {
@@ -73,7 +74,7 @@
         {#each shown as m (m.name)}
           <li class:current={m.name === chat.model}>
             <button class="row" onclick={() => show(m.name)}>
-              <span class="n">{m.name}</span>
+              <span class="n">{m.label ?? m.name}</span>
               {#each chat.capsOf(m.name) as c}<span class="badge cap">{CAP_LABELS[c]}</span>{/each}
               {#if m.name === chat.model}<span class="badge now">En cours</span>{/if}
               {#if chat.unavailable[m.name]}<span class="badge off" title="Ollama répond 410 : ce modèle n'est plus proposé">Indisponible</span>{/if}

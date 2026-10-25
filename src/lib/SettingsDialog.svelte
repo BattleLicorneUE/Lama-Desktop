@@ -295,7 +295,7 @@
         <UpdatePanel {chat} />
       {:else if tab === "system"}
         <ComputerPanel />
-        <HardwarePanel />
+        <HardwarePanel {chat} />
       {:else if tab === "developer"}
         <section>
   <p class="muted">

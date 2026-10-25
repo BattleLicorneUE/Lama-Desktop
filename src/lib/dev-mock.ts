@@ -10,6 +10,8 @@ export function installMock() {
   if (w.__TAURI_INTERNALS__) return;
 
   const callbacks = new Map<number, (e: unknown) => void>();
+  let localInstalled: { id: string; name: string; size_bytes: number; tools: boolean; vision: boolean; license: string }[] = [];
+  let localCancelled = false;
   const listeners = new Map<string, number[]>();
   let nextId = 1;
 
@@ -366,6 +368,31 @@ export function installMock() {
         return null;
       case "hardware_detect":
         return { ram_mb: 24260, ram_free_mb: 14811, cpu: "AMD Ryzen 7 7435HS", cores: 16, avx2: true, disk_free_mb: 69919, gpus: [{ name: "NVIDIA GeForce RTX 4060 Laptop GPU", vendor: "nvidia", vram_mb: 8188, integrated: false }] };
+      case "local_installed":
+        return localInstalled;
+      case "local_status":
+        return { running: null, installing: null, engine_bytes: localInstalled.length ? 38000000 : 0 };
+      case "local_cancel":
+        localCancelled = true;
+        return null;
+      case "local_remove":
+        localInstalled = localInstalled.filter((m) => m.id !== args.id);
+        return null;
+      case "local_install": {
+        const id = String(args.id);
+        localCancelled = false;
+        void (async () => {
+          const total = 5027783488;
+          for (let step = 1; step <= 10 && !localCancelled; step++) {
+            emit("local:progress", { id, phase: step < 2 ? "moteur" : "modèle", file: "Qwen3-8B-Q4_K_M.gguf", done: (total / 10) * step, total });
+            await new Promise((r) => setTimeout(r, 600));
+          }
+          if (localCancelled) return emit("local:error", { id, error: "Installation annulée." });
+          localInstalled = [...localInstalled, { id, name: "Qwen3 8B", size_bytes: total, tools: true, vision: false, license: "Apache-2.0" }];
+          emit("local:done", { id });
+        })();
+        return null;
+      }
       case "local_models_assess":
         return [
           { id: "qwen3-8b", name: "Qwen3 8B", params_b: 8.2, size_mb: 5000, uses: ["chat", "reasoning", "code"], tools: true, vision: false, blurb: "Le bon choix général dès qu'on a une carte graphique de 8 Go.", level: "recommended", mode: "gpu", speed: "fast", reason: "Tient entièrement dans ta carte graphique (8,0 Go) : rapide.", disk_ok: true, need_mb: 6500, best: true },

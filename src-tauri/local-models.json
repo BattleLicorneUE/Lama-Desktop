@@ -1,22 +1,247 @@
 [
-  { "id": "qwen3-1.7b", "name": "Qwen3 1,7B", "params_b": 1.7, "size_mb": 1100, "uses": ["chat", "reasoning"], "tools": true, "vision": false,
-    "blurb": "Minuscule et rapide, même sans carte graphique. Pour des questions simples et des résumés courts." },
-  { "id": "llama3.2-3b", "name": "Llama 3.2 3B", "params_b": 3.2, "size_mb": 2000, "uses": ["chat"], "tools": true, "vision": false,
-    "blurb": "Un petit modèle polyvalent, bon en français pour sa taille." },
-  { "id": "qwen3-4b", "name": "Qwen3 4B", "params_b": 4.0, "size_mb": 2500, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
-    "blurb": "Le meilleur rapport qualité/taille pour un PC modeste. Gère les outils de l'agent." },
-  { "id": "gemma3-4b", "name": "Gemma 3 4B", "params_b": 4.3, "size_mb": 3300, "uses": ["chat"], "tools": false, "vision": true,
-    "blurb": "Comprend les images. Réponses agréables à lire ; pas d'outils pour l'agent." },
-  { "id": "qwen3-8b", "name": "Qwen3 8B", "params_b": 8.2, "size_mb": 5000, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
-    "blurb": "Le bon choix général dès qu'on a une carte graphique de 8 Go. Raisonne et utilise les outils." },
-  { "id": "qwen2.5-coder-7b", "name": "Qwen2.5 Coder 7B", "params_b": 7.6, "size_mb": 4700, "uses": ["code"], "tools": true, "vision": false,
-    "blurb": "Spécialisé dans le code : écriture, explication et correction de programmes." },
-  { "id": "gemma3-12b", "name": "Gemma 3 12B", "params_b": 12.2, "size_mb": 8100, "uses": ["chat"], "tools": false, "vision": true,
-    "blurb": "Un cran au-dessus en qualité et comprend les images. Il faut environ 12 Go de mémoire graphique pour qu'il soit rapide." },
-  { "id": "qwen3-14b", "name": "Qwen3 14B", "params_b": 14.8, "size_mb": 9000, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
-    "blurb": "Très bon raisonnement et très bon avec les outils. Rapide à partir de 12 Go de mémoire graphique." },
-  { "id": "gpt-oss-20b", "name": "gpt-oss 20B", "params_b": 20.9, "active_b": 3.6, "size_mb": 12100, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
-    "blurb": "Modèle « à experts » : gros, mais seule une petite partie travaille à chaque mot, donc il reste vif. Bon avec les outils." },
-  { "id": "qwen3-30b-a3b", "name": "Qwen3 30B-A3B", "params_b": 30.5, "active_b": 3.3, "size_mb": 18600, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
-    "blurb": "Qualité de gros modèle avec la vitesse d'un petit (modèle à experts). Il lui faut beaucoup de mémoire, mais pas forcément de carte graphique." }
+ {
+  "id": "qwen3-1.7b",
+  "name": "Qwen3 1,7B",
+  "params_b": 1.7,
+  "size_mb": 1056,
+  "uses": [
+   "chat",
+   "reasoning"
+  ],
+  "tools": true,
+  "vision": false,
+  "blurb": "Minuscule et rapide, même sans carte graphique. Pour des questions simples et des résumés courts.",
+  "repo": "unsloth/Qwen3-1.7B-GGUF",
+  "license": "Apache-2.0",
+  "files": [
+   {
+    "name": "Qwen3-1.7B-Q4_K_M.gguf",
+    "size": 1107409472,
+    "sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+    "role": "model"
+   }
+  ]
+ },
+ {
+  "id": "llama3.2-3b",
+  "name": "Llama 3.2 3B",
+  "params_b": 3.2,
+  "size_mb": 1926,
+  "uses": [
+   "chat"
+  ],
+  "tools": true,
+  "vision": false,
+  "blurb": "Un petit modèle polyvalent, bon en français pour sa taille.",
+  "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+  "license": "Llama 3.2",
+  "files": [
+   {
+    "name": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+    "size": 2019377696,
+    "sha256": "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
+    "role": "model"
+   }
+  ]
+ },
+ {
+  "id": "qwen3-4b",
+  "name": "Qwen3 4B",
+  "params_b": 4.0,
+  "size_mb": 2382,
+  "uses": [
+   "chat",
+   "reasoning",
+   "code"
+  ],
+  "tools": true,
+  "vision": false,
+  "blurb": "Le meilleur rapport qualité/taille pour un PC modeste. Gère les outils de l'agent.",
+  "repo": "Qwen/Qwen3-4B-GGUF",
+  "license": "Apache-2.0",
+  "files": [
+   {
+    "name": "Qwen3-4B-Q4_K_M.gguf",
+    "size": 2497280256,
+    "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+    "role": "model"
+   }
+  ]
+ },
+ {
+  "id": "gemma3-4b",
+  "name": "Gemma 3 4B",
+  "params_b": 4.3,
+  "size_mb": 3186,
+  "uses": [
+   "chat"
+  ],
+  "tools": false,
+  "vision": true,
+  "blurb": "Comprend les images. Réponses agréables à lire ; pas d'outils pour l'agent.",
+  "repo": "ggml-org/gemma-3-4b-it-GGUF",
+  "license": "Gemma",
+  "files": [
+   {
+    "name": "gemma-3-4b-it-Q4_K_M.gguf",
+    "size": 2489757856,
+    "sha256": "882e8d2db44dc554fb0ea5077cb7e4bc49e7342a1f0da57901c0802ea21a0863",
+    "role": "model"
+   },
+   {
+    "name": "mmproj-model-f16.gguf",
+    "size": 851251104,
+    "sha256": "8c0fb064b019a6972856aaae2c7e4792858af3ca4561be2dbf649123ba6c40cb",
+    "role": "projector"
+   }
+  ]
+ },
+ {
+  "id": "qwen3-8b",
+  "name": "Qwen3 8B",
+  "params_b": 8.2,
+  "size_mb": 4795,
+  "uses": [
+   "chat",
+   "reasoning",
+   "code"
+  ],
+  "tools": true,
+  "vision": false,
+  "blurb": "Le bon choix général dès qu'on a une carte graphique de 8 Go. Raisonne et utilise les outils.",
+  "repo": "Qwen/Qwen3-8B-GGUF",
+  "license": "Apache-2.0",
+  "files": [
+   {
+    "name": "Qwen3-8B-Q4_K_M.gguf",
+    "size": 5027783488,
+    "sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "role": "model"
+   }
+  ]
+ },
+ {
+  "id": "qwen2.5-coder-7b",
+  "name": "Qwen2.5 Coder 7B",
+  "params_b": 7.6,
+  "size_mb": 4466,
+  "uses": [
+   "code"
+  ],
+  "tools": true,
+  "vision": false,
+  "blurb": "Spécialisé dans le code : écriture, explication et correction de programmes.",
+  "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+  "license": "Apache-2.0",
+  "files": [
+   {
+    "name": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+    "size": 4683073536,
+    "sha256": "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c",
+    "role": "model"
+   }
+  ]
+ },
+ {
+  "id": "gemma3-12b",
+  "name": "Gemma 3 12B",
+  "params_b": 12.2,
+  "size_mb": 7777,
+  "uses": [
+   "chat"
+  ],
+  "tools": false,
+  "vision": true,
+  "blurb": "Un cran au-dessus en qualité et comprend les images. Il faut environ 12 Go de mémoire graphique pour qu'il soit rapide.",
+  "repo": "ggml-org/gemma-3-12b-it-GGUF",
+  "license": "Gemma",
+  "files": [
+   {
+    "name": "gemma-3-12b-it-Q4_K_M.gguf",
+    "size": 7300574976,
+    "sha256": "7bb69bff3f48a7b642355d64a90e481182a7794707b3133890646b1efa778ff5",
+    "role": "model"
+   },
+   {
+    "name": "mmproj-model-f16.gguf",
+    "size": 854200224,
+    "sha256": "30c02d056410848227001830866e0a269fcc28aaf8ca971bded494003de9f5a5",
+    "role": "projector"
+   }
+  ]
+ },
+ {
+  "id": "qwen3-14b",
+  "name": "Qwen3 14B",
+  "params_b": 14.8,
+  "size_mb": 8585,
+  "uses": [
+   "chat",
+   "reasoning",
+   "code"
+  ],
+  "tools": true,
+  "vision": false,
+  "blurb": "Très bon raisonnement et très bon avec les outils. Rapide à partir de 12 Go de mémoire graphique.",
+  "repo": "Qwen/Qwen3-14B-GGUF",
+  "license": "Apache-2.0",
+  "files": [
+   {
+    "name": "Qwen3-14B-Q4_K_M.gguf",
+    "size": 9001752960,
+    "sha256": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
+    "role": "model"
+   }
+  ]
+ },
+ {
+  "id": "gpt-oss-20b",
+  "name": "gpt-oss 20B",
+  "params_b": 20.9,
+  "active_b": 3.6,
+  "size_mb": 11549,
+  "uses": [
+   "chat",
+   "reasoning",
+   "code"
+  ],
+  "tools": true,
+  "vision": false,
+  "blurb": "Modèle « à experts » : gros, mais seule une petite partie travaille à chaque mot, donc il reste vif. Bon avec les outils.",
+  "repo": "ggml-org/gpt-oss-20b-GGUF",
+  "license": "Apache-2.0",
+  "files": [
+   {
+    "name": "gpt-oss-20b-MXFP4.gguf",
+    "size": 12109566624,
+    "sha256": "27cd6c432c7672cb812a92f611cf3ba7bbc35928262bb1e1253ff4ee6ae35901",
+    "role": "model"
+   }
+  ]
+ },
+ {
+  "id": "qwen3-30b-a3b",
+  "name": "Qwen3 30B-A3B",
+  "params_b": 30.5,
+  "active_b": 3.3,
+  "size_mb": 17697,
+  "uses": [
+   "chat",
+   "reasoning",
+   "code"
+  ],
+  "tools": true,
+  "vision": false,
+  "blurb": "Qualité de gros modèle avec la vitesse d'un petit (modèle à experts). Il lui faut beaucoup de mémoire, mais pas forcément de carte graphique.",
+  "repo": "Qwen/Qwen3-30B-A3B-GGUF",
+  "license": "Apache-2.0",
+  "files": [
+   {
+    "name": "Qwen3-30B-A3B-Q4_K_M.gguf",
+    "size": 18556685824,
+    "sha256": "0d003f6662faee786ed5da3e31b29c978de5ae5d275c8794c606a7f3c01aa8f5",
+    "role": "model"
+   }
+  ]
+ }
 ]

@@ -80,6 +80,11 @@ fn disk_free(dir: &str) -> u64 {
     if ok { avail / MB } else { 0 }
 }
 
+/// Espace libre (Mo) du disque qui contient `dir` ; le dossier doit exister.
+pub fn free_mb(dir: &std::path::Path) -> u64 {
+    disk_free(&dir.to_string_lossy())
+}
+
 pub fn vendor_of(name: &str) -> Vendor {
     let n = name.to_lowercase();
     if n.contains("nvidia") || n.contains("geforce") || n.contains("quadro") || n.contains("rtx") {
