@@ -1,5 +1,5 @@
 # Les actions sont épinglées sur un commit précis (Dependabot propose les mises à jour).
-# Publie une version : `git tag v0.2.0 && git push origin v0.2.0`.
+# Publie une version : `git tag v0.2.1 && git push origin v0.2.1`, ou lancer ce workflow à la main avec le nom du tag.
 # Compile l'installeur Windows, le signe et le met dans une Release GitHub avec latest.json,
 # que les applications installées lisent pour se mettre à jour.
 name: Publier une version
@@ -7,6 +7,12 @@ name: Publier une version
 on:
   push:
     tags: ["v*"]
+  # Lancement à la main (Actions → Run workflow) : le tag est alors créé par la publication elle-même.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version à publier (ex. v0.2.1), identique à celle de tauri.conf.json"
+        required: true
 
 permissions:
   contents: write
@@ -42,8 +48,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Lama Desktop ${{ github.ref_name }}"
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: "Lama Desktop ${{ inputs.tag || github.ref_name }}"
           releaseBody: "Voir les changements ci-dessous. Les applications installées proposent la mise à jour toute seules."
           releaseDraft: false
           prerelease: false

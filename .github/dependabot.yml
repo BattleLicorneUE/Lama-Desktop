@@ -1,14 +1,32 @@
+# Mises à jour mensuelles, sans changement de version majeure (à faire à la main, avec les tests).
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # Bibliothèques des aperçus : versions fixées exprès (voir src/lib/artifacts.ts).
+      - dependency-name: react
+      - dependency-name: react-dom
+      - dependency-name: mermaid
+      - dependency-name: "@babel/standalone"
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
