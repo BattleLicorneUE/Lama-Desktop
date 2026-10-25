@@ -1,4 +1,8 @@
-﻿# Lama Desktop
+# Lama Desktop
+
+[![Vérifications](https://github.com/BattleLicorneUE/Lama-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/BattleLicorneUE/Lama-Desktop/actions/workflows/ci.yml)
+[![Dernière version](https://img.shields.io/github/v/release/BattleLicorneUE/Lama-Desktop)](https://github.com/BattleLicorneUE/Lama-Desktop/releases/latest)
+[![Licence MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
 Application de bureau pour Windows qui sert de poste de travail avec les modèles **Ollama Cloud** : discussion, projets, agent capable de travailler sur ton ordinateur, gestionnaire de mots de passe, tâches planifiées et plus encore. Tout se passe dans une seule fenêtre, en français.
 
@@ -63,3 +67,12 @@ Une notification apparaît quand Lama a fini de répondre ou de travailler et qu
 - Les aperçus (React, Mermaid) utilisent des bibliothèques livrées avec l'application ; les actions de la CI sont épinglées sur un commit précis.
 
 Pour signaler un problème de sécurité, ouvre une issue sans y mettre d'information sensible.
+
+## Aller plus loin
+- [Télécharger la dernière version](https://github.com/BattleLicorneUE/Lama-Desktop/releases/latest)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Contribuer et publier une version](CONTRIBUTING.md)
+- [Journal des changements](CHANGELOG.md)
+- [Politique de sécurité](SECURITY.md)
+
+Licence [MIT](LICENSE).

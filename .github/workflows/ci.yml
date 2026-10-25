@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# Une nouvelle poussée annule la vérification en cours de la même branche.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: windows-latest
