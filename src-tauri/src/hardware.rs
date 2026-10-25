@@ -164,6 +164,13 @@ const PROBE: &str = "$ErrorActionPreference='SilentlyContinue'; \
       $m = $_.'HardwareInformation.qwMemorySize'; if ($m -is [byte[]]) { $m = [BitConverter]::ToUInt64($m, 0) }; \
       if ($_.DriverDesc) { 'GPU|' + $_.DriverDesc + '|' + [uint64]$m } }";
 
+static CACHE: tokio::sync::OnceCell<Hardware> = tokio::sync::OnceCell::const_new();
+
+/// La machine, lue une seule fois par lancement de l'application (la lecture prend quelques secondes).
+pub async fn cached() -> Hardware {
+    CACHE.get_or_init(|| async { tokio::task::spawn_blocking(detect).await.unwrap_or_else(|_| detect()) }).await.clone()
+}
+
 /// Lit la machine. Peut durer une ou deux secondes : à appeler hors du fil de l'interface.
 pub fn detect() -> Hardware {
     let (ram_mb, ram_free_mb) = memory();

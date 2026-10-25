@@ -10,7 +10,7 @@ export function installMock() {
   if (w.__TAURI_INTERNALS__) return;
 
   const callbacks = new Map<number, (e: unknown) => void>();
-  let localInstalled: { id: string; name: string; size_bytes: number; tools: boolean; vision: boolean; license: string }[] = [];
+  let localInstalled: { id: string; name: string; size_bytes: number; tools: boolean; vision: boolean; license: string; ctx: number; ctx_setting: number; auto_ctx: number; max_ctx: number; options: { ctx: number; mem_mb: number }[] }[] = [];
   let localCancelled = false;
   const listeners = new Map<string, number[]>();
   let nextId = 1;
@@ -372,6 +372,9 @@ export function installMock() {
         return localInstalled;
       case "local_status":
         return { running: null, installing: null, engine_bytes: localInstalled.length ? 38000000 : 0 };
+      case "local_set_ctx":
+        localInstalled = localInstalled.map((m) => (m.id === args.id ? { ...m, ctx_setting: Number(args.ctx), ctx: Number(args.ctx) || m.auto_ctx } : m));
+        return null;
       case "local_cancel":
         localCancelled = true;
         return null;
@@ -388,7 +391,7 @@ export function installMock() {
             await new Promise((r) => setTimeout(r, 600));
           }
           if (localCancelled) return emit("local:error", { id, error: "Installation annulée." });
-          localInstalled = [...localInstalled, { id, name: "Qwen3 8B", size_bytes: total, tools: true, vision: false, license: "Apache-2.0" }];
+          localInstalled = [...localInstalled, { id, name: "Qwen3 8B", size_bytes: total, tools: true, vision: false, license: "Apache-2.0", ctx: 32768, ctx_setting: 0, auto_ctx: 32768, max_ctx: 32768, options: [{ ctx: 8192, mem_mb: 1152 }, { ctx: 16384, mem_mb: 1250 }, { ctx: 32768, mem_mb: 2442 }] }];
           emit("local:done", { id });
         })();
         return null;

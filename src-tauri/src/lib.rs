@@ -120,15 +120,23 @@ fn client_for(api_key: &str) -> Result<OllamaClient, OllamaError> {
 async fn client_for_model(app: &AppHandle, api_key: &str, model: &str) -> Result<OllamaClient, OllamaError> {
     let Some(id) = model.strip_prefix("local:") else { return client_for(api_key) };
     let data = app_root(app).map_err(|e| OllamaError::Status(500, e))?;
-    let (port, key) = localai::ensure_running(&data, id).await.map_err(|e| OllamaError::Status(500, e))?;
+    let model = localmodels::catalog().into_iter().find(|m| m.id == id).ok_or_else(|| OllamaError::Status(404, format!("Modèle local inconnu : {id}")))?;
+    let ctx = localai::effective_ctx(&data, &model, &hardware::cached().await);
+    let (port, key) = localai::ensure_running(&data, id, ctx).await.map_err(|e| OllamaError::Status(500, e))?;
     localai::touch().await;
     OllamaClient::local(port, &key).map_err(|e| OllamaError::Status(500, e))
 }
 
 /// Modèles locaux installés sur ce PC.
 #[tauri::command]
-fn local_installed(app: AppHandle) -> Result<Vec<localai::Installed>, String> {
-    Ok(localai::installed(&app_root(&app)?))
+async fn local_installed(app: AppHandle) -> Result<Vec<localai::Installed>, String> {
+    Ok(localai::installed(&app_root(&app)?, &hardware::cached().await))
+}
+
+/// Taille du contexte d'un modèle local (0 = automatique) ; appliquée au prochain message.
+#[tauri::command]
+fn local_set_ctx(app: AppHandle, id: String, ctx: u32) -> Result<(), String> {
+    localai::set_ctx_setting(&app_root(&app)?, &id, ctx)
 }
 
 #[derive(serde::Serialize)]
@@ -1886,7 +1894,7 @@ pub fn run() {
             project_docs, project_doc_add, project_doc_delete,
             chat_once, mcp_add, mcp_add_custom, mcp_import, mcp_remove,
             secret_get, secret_set, save_text, git_status, git_diff, git_commit,
-            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, local_models_assess, local_installed, local_status, local_install, local_cancel, local_remove, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
+            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, local_models_assess, local_installed, local_set_ctx, local_status, local_install, local_cancel, local_remove, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
             profiles_list, profile_create, profile_update, profile_set_pin, profile_delete, profile_select,
             agents_list, agent_create, agents_import_claude, agents_open_dir,
             model_show, context_report, fs_create, fs_rename, fs_delete,

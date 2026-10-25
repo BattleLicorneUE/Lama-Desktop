@@ -89,11 +89,23 @@ export type Msg = {
 export type Model = { name: string; size: number; remote_host?: string | null; /** Nom affiché si différent de `name` (modèles locaux). */ label?: string; local?: boolean };
 
 /** Un modèle installé sur ce PC (moteur local) ; dans la liste des modèles il s'appelle `local:<id>`. */
-export type LocalInstalled = { id: string; name: string; size_bytes: number; tools: boolean; vision: boolean; license: string };
+export type LocalInstalled = {
+  id: string;
+  name: string;
+  size_bytes: number;
+  tools: boolean;
+  vision: boolean;
+  license: string;
+  /** Contexte utilisé (jetons), choix de l'utilisateur (0 = automatique), valeur automatique et maximum du modèle. */
+  ctx: number;
+  ctx_setting: number;
+  auto_ctx: number;
+  max_ctx: number;
+  options: { ctx: number; mem_mb: number }[];
+};
 export type LocalProgress = { id: string; phase: string; file: string; done: number; total: number };
 export const LOCAL_PREFIX = "local:";
-/** Contexte du moteur local (fixé à son lancement). */
-export const LOCAL_CTX = 8192;
+
 
 /** Modèle proposé tant qu'on n'en a pas choisi un autre : « beam » (gratuit, 1M de contexte, outils) s'il est au catalogue. */
 export const DEFAULT_MODEL = "beam";
@@ -783,7 +795,22 @@ export class ChatStore {
     } catch {
       this.localInstalled = [];
     }
+    // Capacités et contexte des modèles locaux : connus d'avance, et le contexte change quand l'utilisateur le règle.
+    for (const m of this.localInstalled) {
+      this.caps[LOCAL_PREFIX + m.id] = ["completion", ...(m.tools ? ["tools"] : []), ...(m.vision ? ["vision"] : [])];
+      this.ctxInfo[LOCAL_PREFIX + m.id] = { maxCtx: m.ctx };
+    }
     this.mergeModels();
+  }
+
+  /** Règle la taille du contexte d'un modèle local (0 = automatique) ; le moteur est relancé au prochain message. */
+  async setLocalCtx(id: string, ctx: number) {
+    try {
+      await invoke("local_set_ctx", { id, ctx });
+      await this.loadLocal();
+    } catch (e) {
+      this.localError = String(e);
+    }
   }
 
   async installLocal(id: string) {
@@ -813,14 +840,7 @@ export class ChatStore {
 
   async loadCaps(name: string) {
     if (!name || this.caps[name]) return;
-    if (name.startsWith(LOCAL_PREFIX)) {
-      const m = this.localInstalled.find((x) => LOCAL_PREFIX + x.id === name);
-      if (m) {
-        this.caps[name] = ["completion", ...(m.tools ? ["tools"] : []), ...(m.vision ? ["vision"] : [])];
-        this.ctxInfo[name] = { maxCtx: LOCAL_CTX };
-      }
-      return;
-    }
+    if (name.startsWith(LOCAL_PREFIX)) return; // renseignés par loadLocal()
     try {
       const info = await invoke<{ capabilities?: string[]; model_info?: Record<string, unknown> }>("model_show", { name, cloudKey: this.webKey });
       this.caps[name] = info.capabilities ?? [];

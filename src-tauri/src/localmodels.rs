@@ -45,6 +45,10 @@ pub struct Model {
     pub repo: String,
     pub license: String,
     pub files: Vec<ModelFile>,
+    /// Plus grand contexte (en jetons) pour lequel le modèle a été entraîné.
+    pub max_ctx: u32,
+    /// Mémoire du cache de contexte par jeton, en Ko, au format de base (f16).
+    pub kv_kb: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -94,6 +98,43 @@ pub struct Assessed {
     pub verdict: Verdict,
     /// Le choix que je conseille pour ce PC.
     pub best: bool,
+}
+
+/// Tailles de contexte proposées, en jetons (on garde celles que le modèle sait lire).
+pub const CTX_STEPS: [u32; 5] = [8192, 16384, 32768, 65536, 131072];
+/// Au-delà de 8 000 jetons, le cache est compressé en 8 bits : environ la moitié de la mémoire, sans perte sensible.
+pub const KV_QUANT_ABOVE: u32 = 8192;
+const KV_Q8_RATIO: f64 = 0.53;
+/// Le choix automatique ne dépasse pas ce contexte : au-delà, la lecture d'un long prompt devient longue même sur une bonne carte.
+const AUTO_MAX_CTX: u32 = 32768;
+/// Tampons de calcul du moteur, en plus des poids et du cache.
+const COMPUTE_MB: u64 = 700;
+
+pub fn ctx_options(m: &Model) -> Vec<u32> {
+    CTX_STEPS.into_iter().filter(|c| *c <= m.max_ctx).collect()
+}
+
+/// Mémoire (Mo) du cache de contexte pour `ctx` jetons.
+pub fn kv_mb(m: &Model, ctx: u32) -> u64 {
+    let ratio = if ctx > KV_QUANT_ABOVE { KV_Q8_RATIO } else { 1.0 };
+    (m.kv_kb as f64 * ctx as f64 / 1024.0 * ratio).ceil() as u64
+}
+
+/// Le plus grand contexte (jusqu'à 32 000) qui garde le modèle dans la carte graphique ; sinon celui que la mémoire du PC permet,
+/// plafonné à 16 000 car le modèle passe alors en partie par le processeur.
+pub fn auto_ctx(m: &Model, hw: &Hardware) -> u32 {
+    let options: Vec<u32> = ctx_options(m).into_iter().filter(|c| *c <= AUTO_MAX_CTX).collect();
+    let floor = options.first().copied().unwrap_or(KV_QUANT_ABOVE);
+    let weights = m.files.iter().map(|f| f.size).sum::<u64>() / 1_048_576;
+    let pick = |room: u64| options.iter().rev().find(|c| kv_mb(m, **c) <= room).copied();
+    let vram = hw.best_gpu().map(|g| g.vram_mb).unwrap_or(0);
+    if vram > weights + COMPUTE_MB {
+        if let Some(c) = pick(vram - weights - COMPUTE_MB) {
+            return c;
+        }
+    }
+    let ram_room = hw.ram_mb.saturating_sub(OS_RESERVE_MB + weights + 800);
+    pick(ram_room).map(|c| c.min(16384)).unwrap_or(floor)
 }
 
 pub fn catalog() -> Vec<Model> {
@@ -272,5 +313,26 @@ mod tests {
         for a in assess_all(&hw) {
             println!("{:<9} {:<6} {:<7} {}{} | {}", format!("{:?}", a.verdict.level), format!("{:?}", a.verdict.mode), format!("{:?}", a.verdict.speed), a.model.name, if a.best { "  <== conseillé" } else { "" }, a.verdict.reason);
         }
+    }
+
+    #[test]
+    fn context_follows_the_card_and_is_never_below_8k() {
+        let find = |id: &str| catalog().into_iter().find(|m| m.id == id).unwrap();
+        let m8 = find("qwen3-8b");
+        assert_eq!(auto_ctx(&m8, &pc(24260, 8188, 69000)), 32768, "8 Go : le modèle (4,7 Go) + 32k compressé tiennent dans la carte");
+        assert_eq!(auto_ctx(&m8, &pc(24260, 6144, 69000)), 16384, "6 Go : le modèle n'y tient pas, la mémoire du PC complète (plafond 16k)");
+        assert_eq!(auto_ctx(&m8, &pc(16384, 0, 69000)), 16384, "sans carte : plafonné à 16k");
+        assert_eq!(auto_ctx(&m8, &pc(6144, 0, 69000)), 8192, "très peu de mémoire : le minimum");
+        assert_eq!(auto_ctx(&find("llama3.2-3b"), &pc(32768, 24576, 99000)), 32768, "le choix automatique plafonne à 32k même pour un modèle qui lit 128k");
+        assert_eq!(ctx_options(&find("llama3.2-3b")), vec![8192, 16384, 32768, 65536, 131072]);
+        assert_eq!(ctx_options(&m8), vec![8192, 16384, 32768]);
+    }
+
+    #[test]
+    fn cache_cost_halves_when_compressed() {
+        let m = catalog().into_iter().find(|m| m.id == "qwen3-8b").unwrap();
+        assert_eq!(kv_mb(&m, 8192), 1152, "8k en f16 : 144 Ko par jeton");
+        let c32 = kv_mb(&m, 32768);
+        assert!((2300..2600).contains(&c32), "32k compressé : environ 2,4 Go, trouvé {c32}");
     }
 }

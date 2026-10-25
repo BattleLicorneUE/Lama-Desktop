@@ -72,6 +72,13 @@
     if (await askConfirm(`Supprimer ${nameOf(id)} de ce PC ? Tu pourras le télécharger de nouveau plus tard.`, "Supprimer")) await chat.removeLocal(id);
   }
 
+  const tok = (n: number) => (n >= 1024 ? `${Math.round(n / 1024)} k` : String(n));
+  const gbMem = (mb: number) => (mb >= 1024 ? `${(mb / 1024).toFixed(1).replace(".", ",")} Go` : `${mb} Mo`);
+
+  async function pickCtx(id: string, value: string) {
+    await chat.setLocalCtx(id, Number(value));
+  }
+
   function use(id: string) {
     chat.setModel(LOCAL_PREFIX + id);
   }
@@ -110,6 +117,19 @@
           {#if m.vision}<span class="tag soft">images</span>{/if}
           <span class="size">{bytes(m.size_bytes)}</span>
         </header>
+        <label class="ctx">
+          <span>Contexte (mémoire de la conversation)</span>
+          <select value={m.ctx_setting} onchange={(e) => pickCtx(m.id, e.currentTarget.value)} disabled={chat.busy}>
+            <option value={0}>Automatique · {tok(m.auto_ctx)} jetons</option>
+            {#each m.options as o (o.ctx)}
+              <option value={o.ctx}>{tok(o.ctx)} jetons · cache ≈ {gbMem(o.mem_mb)}</option>
+            {/each}
+          </select>
+        </label>
+        <p class="why">
+          Utilisé : <b>{tok(m.ctx)} jetons</b> (≈ {Math.round(m.ctx * 0.75).toLocaleString("fr-FR")} mots). Maximum du modèle : {tok(m.max_ctx)}. Plus le contexte est grand, plus il faut de mémoire et plus la lecture d'un long
+          texte est lente ; si la carte graphique ne suffit plus, le modèle ralentit. Pour coder, 32 k est un bon minimum. Le changement s'applique au prochain message.
+        </p>
         <div class="row">
           <button class="go" onclick={() => use(m.id)} disabled={chat.busy || chat.model === LOCAL_PREFIX + m.id}>Utiliser</button>
           <button onclick={() => remove(m.id)} disabled={busy}>Supprimer</button>
@@ -173,6 +193,8 @@
   .why { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
   .meta, .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .row { margin-top: 2px; gap: 8px; }
+  .ctx { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); max-width: 360px; }
+  .ctx select { border: 1px solid var(--border); background: var(--surface); color: var(--fg); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 13px; }
   .tag { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--code); }
   .tag.soft { color: var(--muted); }
   .tag.no { opacity: 0.7; text-decoration: line-through; text-decoration-thickness: 1px; }

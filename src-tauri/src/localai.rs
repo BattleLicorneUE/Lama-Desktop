@@ -16,7 +16,6 @@ use std::time::{Duration, Instant};
 const NO_WINDOW: u32 = 0x0800_0000;
 /// Version du moteur : épinglée pour que ce qui a été testé soit ce qui est installé.
 const ENGINE_BUILD: &str = "b11878";
-const CONTEXT: &str = "8192";
 /// Le moteur est arrêté (et la mémoire rendue) après ce temps sans demande.
 const IDLE: Duration = Duration::from_secs(15 * 60);
 const SPARE_DISK_MB: u64 = 1024;
@@ -263,6 +262,13 @@ pub async fn install(data: &Path, model: &Model, hw: &Hardware, emit: Arc<dyn Fn
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub struct CtxOption {
+    pub ctx: u32,
+    /// Mémoire supplémentaire du cache de contexte, en Mo.
+    pub mem_mb: u64,
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub struct Installed {
     pub id: String,
     pub name: String,
@@ -270,15 +276,61 @@ pub struct Installed {
     pub tools: bool,
     pub vision: bool,
     pub license: String,
+    /// Contexte utilisé (choix de l'utilisateur, ou automatique).
+    pub ctx: u32,
+    /// Choix de l'utilisateur : 0 = automatique.
+    pub ctx_setting: u32,
+    pub auto_ctx: u32,
+    pub max_ctx: u32,
+    pub options: Vec<CtxOption>,
 }
 
-pub fn installed(data: &Path) -> Vec<Installed> {
+fn config_path(data: &Path) -> PathBuf {
+    root(data).join("config.json")
+}
+
+/// Contexte choisi pour ce modèle (0 = automatique).
+pub fn ctx_setting(data: &Path, id: &str) -> u32 {
+    std::fs::read_to_string(config_path(data)).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()).and_then(|v| v["ctx"][id].as_u64()).unwrap_or(0) as u32
+}
+
+pub fn set_ctx_setting(data: &Path, id: &str, ctx: u32) -> Result<(), String> {
+    let model = localmodels::catalog().into_iter().find(|m| m.id == id).ok_or("Modèle inconnu.")?;
+    if ctx != 0 && !localmodels::ctx_options(&model).contains(&ctx) {
+        return Err("Taille de contexte non prise en charge par ce modèle.".into());
+    }
+    let mut v: serde_json::Value = std::fs::read_to_string(config_path(data)).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_else(|| serde_json::json!({}));
+    v["ctx"][id] = serde_json::json!(ctx);
+    std::fs::create_dir_all(root(data)).map_err(|e| e.to_string())?;
+    std::fs::write(config_path(data), serde_json::to_vec_pretty(&v).unwrap_or_default()).map_err(|e| e.to_string())
+}
+
+/// Le contexte à utiliser : le choix de l'utilisateur s'il est valable, sinon le calcul automatique pour cette machine.
+pub fn effective_ctx(data: &Path, model: &Model, hw: &Hardware) -> u32 {
+    let chosen = ctx_setting(data, &model.id);
+    if chosen != 0 && localmodels::ctx_options(model).contains(&chosen) { chosen } else { localmodels::auto_ctx(model, hw) }
+}
+
+pub fn installed(data: &Path, hw: &Hardware) -> Vec<Installed> {
     let catalog = localmodels::catalog();
     let mut out = Vec::new();
     for m in catalog {
         let dir = models_dir(data).join(&m.id);
         if dir.join("manifest.json").exists() && m.files.iter().all(|f| dir.join(&f.name).exists()) {
-            out.push(Installed { id: m.id.clone(), name: m.name.clone(), size_bytes: m.files.iter().map(|f| f.size).sum(), tools: m.tools, vision: m.vision, license: m.license.clone() });
+            let options = localmodels::ctx_options(&m).into_iter().map(|c| CtxOption { ctx: c, mem_mb: localmodels::kv_mb(&m, c) }).collect();
+            out.push(Installed {
+                id: m.id.clone(),
+                name: m.name.clone(),
+                size_bytes: m.files.iter().map(|f| f.size).sum(),
+                tools: m.tools,
+                vision: m.vision,
+                license: m.license.clone(),
+                ctx: effective_ctx(data, &m, hw),
+                ctx_setting: ctx_setting(data, &m.id),
+                auto_ctx: localmodels::auto_ctx(&m, hw),
+                max_ctx: m.max_ctx,
+                options,
+            });
         }
     }
     out
@@ -311,6 +363,7 @@ struct Running {
     port: u16,
     key: String,
     model_id: String,
+    ctx: u32,
     last_used: Instant,
 }
 
@@ -339,10 +392,10 @@ fn tail(path: &Path) -> String {
 }
 
 /// Le moteur prêt pour ce modèle : le démarre (ou change de modèle) si besoin. Renvoie le port et la clé locale.
-pub async fn ensure_running(data: &Path, model_id: &str) -> Result<(u16, String), String> {
+pub async fn ensure_running(data: &Path, model_id: &str, ctx: u32) -> Result<(u16, String), String> {
     let mut guard = SERVER.lock().await;
     if let Some(r) = guard.as_mut() {
-        if r.model_id == model_id && matches!(r.child.try_wait(), Ok(None)) {
+        if r.model_id == model_id && r.ctx == ctx && matches!(r.child.try_wait(), Ok(None)) {
             r.last_used = Instant::now();
             return Ok((r.port, r.key.clone()));
         }
@@ -362,7 +415,11 @@ pub async fn ensure_running(data: &Path, model_id: &str) -> Result<(u16, String)
     cmd.current_dir(exe.parent().unwrap_or(Path::new(".")))
         .args(["-m"])
         .arg(&weights)
-        .args(["--host", "127.0.0.1", "--port", &port.to_string(), "--api-key", &key, "-c", CONTEXT, "-np", "1", "--jinja", "--no-webui"]);
+        .args(["--host", "127.0.0.1", "--port", &port.to_string(), "--api-key", &key, "-c", &ctx.to_string(), "-np", "1", "--jinja", "--no-webui"]);
+    if ctx > localmodels::KV_QUANT_ABOVE {
+        // Cache de contexte en 8 bits (moitié moins de mémoire) : demande l'attention « flash » pour les valeurs.
+        cmd.args(["-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0"]);
+    }
     if let Some(p) = model.files.iter().find(|f| f.role == "projector") {
         cmd.arg("--mmproj").arg(dir.join(&p.name));
     }
@@ -389,7 +446,7 @@ pub async fn ensure_running(data: &Path, model_id: &str) -> Result<(u16, String)
         }
         tokio::time::sleep(Duration::from_millis(400)).await;
     }
-    *guard = Some(Running { child, port, key: key.clone(), model_id: model_id.to_string(), last_used: Instant::now() });
+    *guard = Some(Running { child, port, key: key.clone(), model_id: model_id.to_string(), ctx, last_used: Instant::now() });
     drop(guard);
     spawn_idle_watcher();
     Ok((port, key))
@@ -564,10 +621,10 @@ mod tests {
         }))
         .await
         .unwrap();
-        assert!(installed(&data).iter().any(|m| m.id == "qwen3-1.7b"));
+        assert!(installed(&data, &hw).iter().any(|m| m.id == "qwen3-1.7b"));
 
         let t = Instant::now();
-        let (port, key) = ensure_running(&data, "qwen3-1.7b").await.unwrap();
+        let (port, key) = ensure_running(&data, "qwen3-1.7b", 16384).await.unwrap();
         println!("moteur prêt en {:?} sur le port {port}", t.elapsed());
         let client = OllamaClient::local(port, &key).unwrap();
         let ask = |text: &str| ChatMessage { role: "user".into(), content: text.into(), thinking: None, tool_calls: None, tool_name: None, images: None };
@@ -592,6 +649,32 @@ mod tests {
         assert_eq!(calls[0]["function"]["name"], "get_weather");
         assert!(usage.0 > 0 && usage.1 > 0);
 
+        // Un contexte bien plus long que 8 000 jetons : l'information est au début, ~11 000 jetons de remplissage suivent.
+        let filler = "Le ciel est bleu et la mer est calme. ".repeat(1100);
+        let long = format!("Le code secret est 7421. Retiens-le.
+
+{filler}
+
+Quel est le code secret ? Réponds seulement par le nombre.");
+        let mut answer = String::new();
+        let mut used = 0;
+        let t = Instant::now();
+        client.chat_stream("local:qwen3-1.7b", &[ask(&long)], None, Some(serde_json::json!({ "think": false, "temperature": 0, "num_predict": 16 })), |c| {
+            answer.push_str(&c.content);
+            if c.done {
+                used = c.prompt_tokens;
+            }
+        })
+        .await
+        .unwrap();
+        println!("long prompt : {used} jetons lus en {:?} ; réponse {answer:?}", t.elapsed());
+        assert!(used > 9000, "le prompt doit dépasser les 8 000 jetons de l'ancienne limite : {used}");
+        assert!(answer.contains("7421"), "{answer}");
+        println!("{}", tail(&root(&data).join("server.log")));
+
+        // Changer de contexte relance le moteur.
+        let (_, key2) = ensure_running(&data, "qwen3-1.7b", 8192).await.unwrap();
+        assert_ne!(key, key2, "un autre contexte redémarre le moteur");
         shutdown().await;
         assert!(running_model().await.is_none());
     }
