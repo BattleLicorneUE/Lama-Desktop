@@ -1,0 +1,22 @@
+[
+  { "id": "qwen3-1.7b", "name": "Qwen3 1,7B", "params_b": 1.7, "size_mb": 1100, "uses": ["chat", "reasoning"], "tools": true, "vision": false,
+    "blurb": "Minuscule et rapide, même sans carte graphique. Pour des questions simples et des résumés courts." },
+  { "id": "llama3.2-3b", "name": "Llama 3.2 3B", "params_b": 3.2, "size_mb": 2000, "uses": ["chat"], "tools": true, "vision": false,
+    "blurb": "Un petit modèle polyvalent, bon en français pour sa taille." },
+  { "id": "qwen3-4b", "name": "Qwen3 4B", "params_b": 4.0, "size_mb": 2500, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
+    "blurb": "Le meilleur rapport qualité/taille pour un PC modeste. Gère les outils de l'agent." },
+  { "id": "gemma3-4b", "name": "Gemma 3 4B", "params_b": 4.3, "size_mb": 3300, "uses": ["chat"], "tools": false, "vision": true,
+    "blurb": "Comprend les images. Réponses agréables à lire ; pas d'outils pour l'agent." },
+  { "id": "qwen3-8b", "name": "Qwen3 8B", "params_b": 8.2, "size_mb": 5000, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
+    "blurb": "Le bon choix général dès qu'on a une carte graphique de 8 Go. Raisonne et utilise les outils." },
+  { "id": "qwen2.5-coder-7b", "name": "Qwen2.5 Coder 7B", "params_b": 7.6, "size_mb": 4700, "uses": ["code"], "tools": true, "vision": false,
+    "blurb": "Spécialisé dans le code : écriture, explication et correction de programmes." },
+  { "id": "gemma3-12b", "name": "Gemma 3 12B", "params_b": 12.2, "size_mb": 8100, "uses": ["chat"], "tools": false, "vision": true,
+    "blurb": "Un cran au-dessus en qualité et comprend les images. Il faut environ 12 Go de mémoire graphique pour qu'il soit rapide." },
+  { "id": "qwen3-14b", "name": "Qwen3 14B", "params_b": 14.8, "size_mb": 9000, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
+    "blurb": "Très bon raisonnement et très bon avec les outils. Rapide à partir de 12 Go de mémoire graphique." },
+  { "id": "gpt-oss-20b", "name": "gpt-oss 20B", "params_b": 20.9, "active_b": 3.6, "size_mb": 12100, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
+    "blurb": "Modèle « à experts » : gros, mais seule une petite partie travaille à chaque mot, donc il reste vif. Bon avec les outils." },
+  { "id": "qwen3-30b-a3b", "name": "Qwen3 30B-A3B", "params_b": 30.5, "active_b": 3.3, "size_mb": 18600, "uses": ["chat", "reasoning", "code"], "tools": true, "vision": false,
+    "blurb": "Qualité de gros modèle avec la vitesse d'un petit (modèle à experts). Il lui faut beaucoup de mémoire, mais pas forcément de carte graphique." }
+]

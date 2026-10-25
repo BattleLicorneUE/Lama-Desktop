@@ -1,14 +1,14 @@
 //! Ce que le PC peut faire tourner : mémoire, carte graphique, processeur et espace disque.
 //! Sert à recommander des modèles locaux adaptés ; rien n'est envoyé hors de la machine.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 
 const NO_WINDOW: u32 = 0x0800_0000;
 const MB: u64 = 1024 * 1024;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Vendor {
     Nvidia,
@@ -17,7 +17,7 @@ pub enum Vendor {
     Other,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Gpu {
     pub name: String,
     pub vendor: Vendor,
@@ -27,7 +27,7 @@ pub struct Gpu {
     pub integrated: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hardware {
     pub ram_mb: u64,
     pub ram_free_mb: u64,

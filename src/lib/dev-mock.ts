@@ -366,6 +366,12 @@ export function installMock() {
         return null;
       case "hardware_detect":
         return { ram_mb: 24260, ram_free_mb: 14811, cpu: "AMD Ryzen 7 7435HS", cores: 16, avx2: true, disk_free_mb: 69919, gpus: [{ name: "NVIDIA GeForce RTX 4060 Laptop GPU", vendor: "nvidia", vram_mb: 8188, integrated: false }] };
+      case "local_models_assess":
+        return [
+          { id: "qwen3-8b", name: "Qwen3 8B", params_b: 8.2, size_mb: 5000, uses: ["chat", "reasoning", "code"], tools: true, vision: false, blurb: "Le bon choix général dès qu'on a une carte graphique de 8 Go.", level: "recommended", mode: "gpu", speed: "fast", reason: "Tient entièrement dans ta carte graphique (8,0 Go) : rapide.", disk_ok: true, need_mb: 6500, best: true },
+          { id: "qwen3-14b", name: "Qwen3 14B", params_b: 14.8, size_mb: 9000, uses: ["chat", "reasoning"], tools: true, vision: false, blurb: "Très bon raisonnement.", level: "possible", mode: "mixed", speed: "medium", reason: "Il faut 10,3 Go : une partie dans la carte graphique, le reste dans la mémoire du PC. Vitesse correcte.", disk_ok: true, need_mb: 10500, best: false },
+          { id: "gemma3-4b", name: "Gemma 3 4B", params_b: 4.3, size_mb: 3300, uses: ["chat"], tools: false, vision: true, blurb: "Comprend les images.", level: "heavy", mode: null, speed: null, reason: "Exemple de modèle trop lourd.", disk_ok: true, need_mb: 4800, best: false },
+        ];
       case "pc_get":
         return pc;
       case "pc_set":

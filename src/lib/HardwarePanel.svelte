@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
+  import LocalModelsList from "$lib/LocalModelsList.svelte";
 
   type Gpu = { name: string; vendor: "nvidia" | "amd" | "intel" | "other"; vram_mb: number; integrated: boolean };
   type Hardware = { ram_mb: number; ram_free_mb: number; cpu: string; cores: number; avx2: boolean; gpus: Gpu[]; disk_free_mb: number };
@@ -63,6 +64,8 @@
   {#if error}<p class="bad" role="alert">{error}</p>{/if}
   <div class="row"><button onclick={detect} disabled={busy}>Analyser de nouveau</button></div>
 </section>
+
+{#if hw}<LocalModelsList hardware={hw} />{/if}
 
 <style>
   section { display: flex; flex-direction: column; gap: 10px; margin-top: 28px; }

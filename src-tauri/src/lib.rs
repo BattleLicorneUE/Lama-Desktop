@@ -21,6 +21,7 @@ mod appsettings;
 mod secrets;
 mod system;
 mod hardware;
+mod localmodels;
 mod templates;
 mod ollama;
 mod skills;
@@ -955,6 +956,12 @@ async fn hardware_detect() -> Result<hardware::Hardware, String> {
     tokio::task::spawn_blocking(hardware::detect).await.map_err(|e| e.to_string())
 }
 
+/// Les modèles locaux du catalogue, jugés pour la machine décrite par `hardware` (le résultat de `hardware_detect`).
+#[tauri::command]
+fn local_models_assess(hardware: hardware::Hardware) -> Vec<localmodels::Assessed> {
+    localmodels::assess_all(&hardware)
+}
+
 #[tauri::command]
 fn pc_get(app: AppHandle) -> Result<PcSettings, String> {
     Ok(load_pc(&profile_dir(&app)?))
@@ -1810,7 +1817,7 @@ pub fn run() {
             project_docs, project_doc_add, project_doc_delete,
             chat_once, mcp_add, mcp_add_custom, mcp_import, mcp_remove,
             secret_get, secret_set, save_text, git_status, git_diff, git_commit,
-            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
+            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, local_models_assess, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
             profiles_list, profile_create, profile_update, profile_set_pin, profile_delete, profile_select,
             agents_list, agent_create, agents_import_claude, agents_open_dir,
             model_show, context_report, fs_create, fs_rename, fs_delete,
