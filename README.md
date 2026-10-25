@@ -6,7 +6,7 @@
 
 Application de bureau pour Windows qui sert de poste de travail avec les modèles **Ollama Cloud** : discussion, projets, agent capable de travailler sur ton ordinateur, gestionnaire de mots de passe, tâches planifiées et plus encore. Tout se passe dans une seule fenêtre, en français.
 
-> Projet personnel en version 0.2.0. Windows uniquement pour l'instant.
+> Projet personnel (version 0.2.1). Windows uniquement pour l'instant.
 
 ## Ce que fait l'application
 
