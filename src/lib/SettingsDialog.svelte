@@ -231,18 +231,10 @@
   {:else if chat.cloudStatus === "error"}
     <p class="muted ctxnote bad">{chat.cloudError}</p>
   {/if}
-  <p class="muted">La clé est rangée dans le coffre Windows de ce profil et n'est envoyée qu'à ollama.com. La même clé sert à la recherche web (bouton globe).</p>
+  <p class="muted">La clé est rangée dans le coffre Windows de ce profil et n'est envoyée qu'à ollama.com.</p>
   <label class="check">
     <input type="checkbox" checked={chat.webSearch} onchange={(e) => chat.setWebSearch(e.currentTarget.checked)} />
-    Autoriser le modèle à chercher sur le web (bouton globe de la zone de saisie)
-  </label>
-  <label class="field">
-    <span>Moteur de recherche</span>
-    <select value={chat.searchEngine} onchange={(e) => chat.setSearchEngine(e.currentTarget.value as "auto" | "duckduckgo" | "ollama")}>
-      <option value="auto">Automatique (Ollama avec un modèle cloud et une clé, sinon DuckDuckGo)</option>
-      <option value="duckduckgo">Toujours DuckDuckGo (sans clé, sans passer par Ollama)</option>
-      <option value="ollama">Toujours Ollama (clé nécessaire)</option>
-    </select>
+    Autoriser le modèle à chercher sur le web avec DuckDuckGo (bouton globe de la zone de saisie)
   </label>
   <p class="muted">DuckDuckGo n'a pas d'API officielle : si le site bloque les requêtes de l'application, la recherche affiche une erreur claire. En mode Manuel, chaque page lue demande ton accord ; les adresses locales sont refusées.</p>
 </section>

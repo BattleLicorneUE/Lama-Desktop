@@ -5,7 +5,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use regex::Regex;
-use serde_json::{json, Value};
+
 
 const UA: &str = concat!("Mozilla/5.0 (Windows NT 10.0; Win64; x64) LamaDesktop/", env!("CARGO_PKG_VERSION"));
 const MAX_PAGE_BYTES: usize = 2_000_000;
@@ -212,35 +212,9 @@ fn format_hits(hits: &[Hit]) -> String {
         .join("\n")
 }
 
-/// Recherche via l'API web d'Ollama si une clé est fournie, sinon via DuckDuckGo.
-pub async fn search(query: &str, ollama_key: Option<&str>) -> Result<String, String> {
+/// Recherche web via DuckDuckGo (sans compte ni clé).
+pub async fn search(query: &str) -> Result<String, String> {
     let client = http()?;
-    if let Some(key) = ollama_key.filter(|k| !k.trim().is_empty()) {
-        let resp = client
-            .post("https://ollama.com/api/web_search")
-            .bearer_auth(key.trim())
-            .json(&json!({ "query": query, "max_results": 6 }))
-            .send()
-            .await
-            .map_err(|e| format!("Recherche échouée : {e}"))?;
-        if !resp.status().is_success() {
-            return Err(format!("L'API de recherche Ollama a répondu {}", resp.status()));
-        }
-        let v: Value = resp.json().await.map_err(|e| e.to_string())?;
-        let hits: Vec<Hit> = v["results"]
-            .as_array()
-            .map(|a| {
-                a.iter()
-                    .map(|r| Hit {
-                        title: r["title"].as_str().unwrap_or("").into(),
-                        url: r["url"].as_str().unwrap_or("").into(),
-                        snippet: r["content"].as_str().unwrap_or("").chars().take(400).collect(),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        return Ok(format_hits(&hits));
-    }
     let resp = client
         .get("https://html.duckduckgo.com/html/")
         .query(&[("q", query)])
@@ -298,7 +272,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn live_search_and_fetch() {
-        let out = search("rust programming language", None).await.unwrap();
+        let out = search("rust programming language").await.unwrap();
         println!("{out}");
         assert!(out.contains("http"), "aucun résultat analysé");
         let page = fetch("https://example.com").await.unwrap();
