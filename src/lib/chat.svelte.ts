@@ -397,6 +397,8 @@ export class ChatStore {
   projectMemories = $state<Memory[]>([]);
   /** Recherche web (outils web_search / web_fetch) activée pour l'agent. */
   webSearch = $state(load("web", "1") === "1");
+  /** Moteur de la recherche web : « auto » = Ollama avec un modèle cloud et une clé, DuckDuckGo avec un modèle local. */
+  searchEngine = $state<"auto" | "duckduckgo" | "ollama">(load("searchEngine", "auto") as "auto" | "duckduckgo" | "ollama");
   /** Clé API d'Ollama Cloud (sert aussi à la recherche web). Nom historique : `webKey`. */
   webKey = $state("");
   /** Modèle utilisé en mode Plan (vide = le modèle courant). */
@@ -588,6 +590,17 @@ export class ChatStore {
     this.theme = t;
     save("theme", t);
     this.applyTheme();
+  }
+
+  setSearchEngine(v: "auto" | "duckduckgo" | "ollama") {
+    this.searchEngine = v;
+    save("searchEngine", v);
+  }
+
+  /** La clé à donner à la recherche web : sans clé, l'agent passe par DuckDuckGo. */
+  searchKeyFor(model: string): string | null {
+    const useOllama = this.searchEngine === "ollama" || (this.searchEngine === "auto" && !model.startsWith(LOCAL_PREFIX));
+    return useOllama && this.webKey ? this.webKey : null;
   }
 
   setWebSearch(v: boolean) {
@@ -1826,7 +1839,7 @@ export class ChatStore {
         workspace: this.mode === "code" ? this.workspace.trim() : null,
         mode: this.permission,
         web: this.webSearch || deep,
-        webKey: this.webKey || null,
+        webKey: this.searchKeyFor(chosen),
         attachments: attachmentsForTool($state.snapshot(s.messages)),
         docs: indexed.length ? indexed : null,
         projectId: project?.id ?? null,

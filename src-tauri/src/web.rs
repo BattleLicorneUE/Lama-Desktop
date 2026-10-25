@@ -195,6 +195,12 @@ pub fn parse_ddg(html: &str) -> Vec<Hit> {
         .collect()
 }
 
+/// DuckDuckGo répond « 202 » ou une page de vérification quand il soupçonne un robot : sans résultat, ce n'est pas « aucun résultat ».
+fn ddg_blocked(status: u16, html: &str) -> bool {
+    let h = html.to_lowercase();
+    status == 202 || h.contains("anomaly") || h.contains("challenge") || h.contains("captcha")
+}
+
 fn format_hits(hits: &[Hit]) -> String {
     if hits.is_empty() {
         return "Aucun résultat.".into();
@@ -244,7 +250,12 @@ pub async fn search(query: &str, ollama_key: Option<&str>) -> Result<String, Str
     if !resp.status().is_success() {
         return Err(format!("DuckDuckGo a répondu {}", resp.status()));
     }
-    let hits = parse_ddg(&resp.text().await.map_err(|e| e.to_string())?);
+    let status = resp.status();
+    let html = resp.text().await.map_err(|e| e.to_string())?;
+    let hits = parse_ddg(&html);
+    if hits.is_empty() && ddg_blocked(status.as_u16(), &html) {
+        return Err("DuckDuckGo a refusé la recherche (il prend l'application pour un robot). Réessaie plus tard, ou choisis un autre moteur dans Réglages.".into());
+    }
     Ok(format_hits(&hits[..hits.len().min(8)]))
 }
 
@@ -263,6 +274,13 @@ mod tests {
         assert_eq!(percent_decode("https%3A%2F%2Fa.fr%2Fcaf%C3%A9"), "https://a.fr/café");
         assert_eq!(percent_decode("100%"), "100%");
         assert_eq!(percent_decode("a+b"), "a b");
+    }
+
+    #[test]
+    fn recognises_a_duckduckgo_block_page() {
+        assert!(ddg_blocked(202, ""));
+        assert!(ddg_blocked(200, "<div class=\"anomaly-modal\">Unfortunately, bots use DuckDuckGo too.</div>"));
+        assert!(!ddg_blocked(200, "<div class=\"no-results\">Aucun résultat</div>"));
     }
 
     #[test]
