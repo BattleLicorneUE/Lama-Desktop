@@ -75,6 +75,24 @@ npm run check                          # types Svelte / TypeScript
 cargo test --lib --manifest-path src-tauri/Cargo.toml
 ```
 
+## Mises à jour automatiques
+
+L'application vérifie au lancement (et dans Réglages → Mises à jour) s'il existe une version plus récente dans les [Releases](https://github.com/BattleLicorneUE/Lama-Desktop/releases) du dépôt. Elle la télécharge, vérifie sa signature, s'installe et se relance. Les données des utilisateurs ne sont pas touchées.
+
+Pour publier une version :
+
+1. Change le numéro de version dans `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` et `package.json`.
+2. Commite, puis envoie un tag :
+
+```bash
+git tag v0.2.0
+git push origin main v0.2.0
+```
+
+3. Le workflow `.github/workflows/release.yml` compile, signe et publie l'installeur et `latest.json`.
+
+Mise en place unique : ajouter dans Settings → Secrets and variables → Actions les secrets `TAURI_SIGNING_PRIVATE_KEY` (contenu du fichier de clé privée) et `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (vide si la clé n'a pas de mot de passe). Le dépôt doit être public pour que les applications puissent lire les Releases. Ne perds jamais la clé privée et ne la mets jamais dans le dépôt.
+
 ## Technologies
 - **Tauri 2** et **Rust** pour le cœur de l'application (agent, coffre, navigateur, base SQLite).
 - **SvelteKit** et **Svelte 5** pour l'interface.

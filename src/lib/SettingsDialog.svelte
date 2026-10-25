@@ -16,6 +16,7 @@
   import DataPanel from "$lib/DataPanel.svelte";
   import ProgressPanel from "$lib/ProgressPanel.svelte";
   import VaultPanel from "$lib/VaultPanel.svelte";
+  import UpdatePanel from "$lib/UpdatePanel.svelte";
 
   let { chat, profileName, onclose }: { chat: ChatStore; profileName: string; onclose: () => void } = $props();
 
@@ -23,7 +24,7 @@
   let servers = $state<Status[]>([]);
   let busy = $state(false);
   let keyInput = $state<HTMLInputElement>();
-  type Tab = "general" | "account" | "profile" | "models" | "memory" | "vault" | "progress" | "usage" | "data" | "system" | "developer" | "skills" | "agents" | "connectors";
+  type Tab = "general" | "account" | "profile" | "models" | "memory" | "vault" | "progress" | "usage" | "data" | "update" | "system" | "developer" | "skills" | "agents" | "connectors";
   // Ouverture directe sur une page (la progression depuis la puce de niveau) : lecture voulue, une seule fois.
   // svelte-ignore state_referenced_locally
   let tab = $state<Tab>((chat.settingsTab as Tab | null) ?? "general");
@@ -45,6 +46,7 @@
         { id: "progress", label: "Progression", icon: "trophy" },
         { id: "usage", label: "Utilisation", icon: "gauge" },
         { id: "data", label: "Données et sauvegarde", icon: "download" },
+        { id: "update", label: "Mises à jour", icon: "download" },
       ],
     },
     {
@@ -288,6 +290,8 @@
         <UsagePanel {chat} />
       {:else if tab === "data"}
         <DataPanel {chat} />
+      {:else if tab === "update"}
+        <UpdatePanel {chat} />
       {:else if tab === "system"}
         <ComputerPanel />
       {:else if tab === "developer"}

@@ -38,6 +38,18 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "shortDescription": "Interface desktop pour Ollama"
+    "shortDescription": "Interface desktop pour Ollama",
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVERUQ1N0Q0MTA4NUZGRjYKUldUMi80VVExRmZ0N1hzVldGZFlTZm1neEdzUVNMSHRrMGErZkEzY0lJRU04OUJkdHNqQjhXRWwK",
+      "endpoints": [
+        "https://github.com/BattleLicorneUE/Lama-Desktop/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
