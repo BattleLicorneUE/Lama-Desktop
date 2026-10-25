@@ -3,6 +3,7 @@
 //! Format de configuration identique à Claude Desktop et Claude Code :
 //! `{ "mcpServers": { nom: { command, args, env } | { "type": "http", "url": …, "headers": … } } }`.
 
+use crate::sync::MutexExt;
 use std::{
     collections::HashMap,
     path::Path,
@@ -458,7 +459,7 @@ mod tests {
                     let msg: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
                     let method = msg["method"].as_str().unwrap_or("").to_string();
                     let session = head.lines().find_map(|l| l.to_lowercase().strip_prefix("mcp-session-id:").map(|v| v.trim().to_string()));
-                    seen.lock().unwrap().push((method.clone(), session));
+                    seen.lock_safe().push((method.clone(), session));
                     let id = msg["id"].clone();
                     let reply = match method.as_str() {
                         "initialize" => {
@@ -497,7 +498,7 @@ mod tests {
         assert_eq!(full, "mcp__unreal_mcp__call_tool");
         let (server, tool) = hub.resolve(&full).unwrap();
         assert_eq!(hub.call(&server, &tool, json!({})).await.unwrap(), "fait");
-        let log = seen.lock().unwrap().clone();
+        let log = seen.lock_safe().clone();
         assert_eq!(log[0], ("initialize".to_string(), None), "pas de session avant l'initialisation");
         assert!(log[1..].iter().all(|(_, s)| s.as_deref() == Some("abc123")), "la session est renvoyée ensuite : {log:?}");
         let _ = std::fs::remove_dir_all(dir);

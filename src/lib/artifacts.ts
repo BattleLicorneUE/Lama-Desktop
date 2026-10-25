@@ -1,5 +1,14 @@
 /** Artefacts : contenus générés par le modèle qu'on affiche à côté de la conversation (page web, SVG, composant React, diagramme, document). */
 
+// Bibliothèques des aperçus, livrées avec l'application (versions fixées dans package.json) : pas de dépendance à un CDN.
+import reactUrl from "../../node_modules/react/umd/react.production.min.js?url";
+import reactDomUrl from "../../node_modules/react-dom/umd/react-dom.production.min.js?url";
+import babelUrl from "../../node_modules/@babel/standalone/babel.min.js?url";
+import mermaidUrl from "../../node_modules/mermaid/dist/mermaid.min.js?url";
+
+/** Adresse absolue d'une bibliothèque livrée avec l'application (le cadre d'aperçu n'a pas d'origine propre). */
+const local = (u: string) => new URL(u, location.href).href;
+
 export type Artifact = { code: string; lang: string; title: string };
 
 const ALIASES: Record<string, string> = { jsx: "react", tsx: "react", md: "markdown", mmd: "mermaid" };
@@ -52,10 +61,10 @@ export function lastOpenable(text: string): Artifact | null {
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // Document isolé : scripts autorisés mais sans accès à l'application (pas de allow-same-origin) ni aux données ;
-// seules quelques bibliothèques courantes peuvent être chargées depuis un CDN.
-const CSP =
-  "default-src 'none'; img-src data: blob: https:; media-src data: blob:; connect-src https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; font-src data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; script-src 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://cdn.tailwindcss.com";
-const GUARD = `<meta http-equiv="Content-Security-Policy" content="${CSP}">`;
+// React, Babel et Mermaid sont fournis par l'application ; quelques CDN restent autorisés pour les pages HTML (et Tailwind, en version fixée).
+const csp = () =>
+  "default-src 'none'; img-src data: blob: https:; media-src data: blob:; connect-src https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; font-src data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; script-src 'unsafe-inline' 'unsafe-eval' " + location.origin + " https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://cdn.tailwindcss.com";
+const guard = () => `<meta http-equiv="Content-Security-Policy" content="${csp()}">`;
 
 const ERROR_BOX =
   "window.addEventListener('error',function(e){var r=document.getElementById('root')||document.body;r.innerHTML='<pre style=\"color:#b3261e;white-space:pre-wrap;font:13px/1.5 ui-monospace,monospace;padding:16px\">'+String(e.message).replace(/</g,'&lt;')+'</pre>'});";
@@ -79,22 +88,22 @@ export function buildDoc(lang: string, code: string, dark: boolean): string {
   const fg = dark ? "#e8e6e1" : "#1f1f1d";
   const bg = dark ? "#1f1f1e" : "#ffffff";
   if (l === "svg") {
-    return `<!doctype html><html><head>${GUARD}</head><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:${bg}">${code}</body></html>`;
+    return `<!doctype html><html><head>${guard()}</head><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:${bg}">${code}</body></html>`;
   }
   if (l === "mermaid") {
-    return `<!doctype html><html><head>${GUARD}<style>body{margin:0;padding:16px;display:grid;place-items:center;min-height:100vh;background:${bg};color:${fg};font-family:system-ui}</style></head><body><pre class="mermaid">${esc(code)}</pre>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+    return `<!doctype html><html><head>${guard()}<style>body{margin:0;padding:16px;display:grid;place-items:center;min-height:100vh;background:${bg};color:${fg};font-family:system-ui}</style></head><body><pre class="mermaid">${esc(code)}</pre>
+<script src="${local(mermaidUrl)}"></script>
 <script>${ERROR_BOX}mermaid.initialize({startOnLoad:false,theme:${dark ? "'dark'" : "'default'"},securityLevel:'strict'});mermaid.run().catch(function(e){document.body.innerHTML='<pre style="color:#b3261e;white-space:pre-wrap">'+String(e.message||e).replace(/</g,'&lt;')+'</pre>'});</script></body></html>`;
   }
   if (l === "react") {
     const { body, name } = reactSource(code);
     // Les « </script> » du code ne doivent pas fermer la balise.
     const safe = body.replace(/<\/script/gi, "<\\/script");
-    return `<!doctype html><html><head>${GUARD}<style>body{margin:0;font-family:system-ui,sans-serif}</style>
-<script src="https://cdn.tailwindcss.com"></script></head><body><div id="root"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+    return `<!doctype html><html><head>${guard()}<style>body{margin:0;font-family:system-ui,sans-serif}</style>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script></head><body><div id="root"></div>
+<script src="${local(reactUrl)}"></script>
+<script src="${local(reactDomUrl)}"></script>
+<script src="${local(babelUrl)}"></script>
 <script>${ERROR_BOX}</script>
 <script type="text/babel" data-presets="react">
 const {useState,useEffect,useRef,useMemo,useCallback,useReducer,useContext,useLayoutEffect,createContext,Fragment,memo,forwardRef} = React;
@@ -104,8 +113,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
   }
   // html : page complète ou fragment
   return /<head[\s>]/i.test(code)
-    ? code.replace(/<head([^>]*)>/i, `<head$1>${GUARD}`)
-    : `<!doctype html><html><head>${GUARD}</head><body>${code}</body></html>`;
+    ? code.replace(/<head([^>]*)>/i, `<head$1>${guard()}`)
+    : `<!doctype html><html><head>${guard()}</head><body>${code}</body></html>`;
 }
 
 export const EXT: Record<string, string> = { html: "html", svg: "svg", react: "jsx", mermaid: "mmd", markdown: "md" };

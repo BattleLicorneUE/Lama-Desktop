@@ -7,7 +7,7 @@ use std::time::Duration;
 use regex::Regex;
 use serde_json::{json, Value};
 
-const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LamaDesktop/0.1";
+const UA: &str = concat!("Mozilla/5.0 (Windows NT 10.0; Win64; x64) LamaDesktop/", env!("CARGO_PKG_VERSION"));
 const MAX_PAGE_BYTES: usize = 2_000_000;
 const MAX_TEXT: usize = 15_000;
 

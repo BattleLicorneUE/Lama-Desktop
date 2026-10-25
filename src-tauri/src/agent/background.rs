@@ -1,6 +1,7 @@
 //! Commandes longues lancées en arrière-plan (serveur de dev, surveillance de fichiers…) :
 //! l'agent les démarre sans attendre, lit leur sortie plus tard et peut les arrêter.
 
+use crate::sync::MutexExt;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -71,12 +72,12 @@ fn tail_of(text: &str, max: usize) -> String {
 
 impl Registry {
     fn get(&self, id: &str) -> Result<Arc<Proc>, String> {
-        self.procs.lock().unwrap().get(id).cloned().ok_or_else(|| format!("Aucune commande d'id « {id} »."))
+        self.procs.lock_safe().get(id).cloned().ok_or_else(|| format!("Aucune commande d'id « {id} »."))
     }
 
     /// Lance `command` dans `root` et renvoie son identifiant.
     pub fn start(&self, root: &Path, command: &str) -> Result<String, String> {
-        let running = self.procs.lock().unwrap().values().filter(|p| p.code.lock().unwrap().is_none()).count();
+        let running = self.procs.lock_safe().values().filter(|p| p.code.lock_safe().is_none()).count();
         if running >= MAX_RUNNING {
             return Err(format!("Déjà {MAX_RUNNING} commandes en arrière-plan : arrête-en une avec stop_command."));
         }
@@ -104,14 +105,14 @@ impl Registry {
             stop: Notify::new(),
         });
         let id = uuid::Uuid::new_v4().simple().to_string()[..8].to_string();
-        self.procs.lock().unwrap().insert(id.clone(), proc.clone());
+        self.procs.lock_safe().insert(id.clone(), proc.clone());
 
         tokio::spawn(async move {
             loop {
                 tokio::select! {
                     line = rx.recv() => match line {
                         Some(l) => {
-                            let mut out = proc.output.lock().unwrap();
+                            let mut out = proc.output.lock_safe();
                             out.push_str(&l);
                             out.push('\n');
                             if out.len() > 2 * KEEP_OUTPUT {
@@ -129,7 +130,7 @@ impl Registry {
                 }
             }
             let code = child.wait().await.ok().and_then(|s| s.code()).unwrap_or(-1);
-            *proc.code.lock().unwrap() = Some(code);
+            *proc.code.lock_safe() = Some(code);
         });
         Ok(id)
     }
@@ -137,33 +138,33 @@ impl Registry {
     /// État et fin de la sortie d'une commande.
     pub fn output(&self, id: &str, max: usize) -> Result<String, String> {
         let p = self.get(id)?;
-        let state = match *p.code.lock().unwrap() {
+        let state = match *p.code.lock_safe() {
             None => "en cours".to_string(),
-            Some(c) if *p.stopped_by_user.lock().unwrap() => format!("arrêtée (code {c})"),
+            Some(c) if *p.stopped_by_user.lock_safe() => format!("arrêtée (code {c})"),
             Some(c) => format!("terminée (code {c})"),
         };
-        let out = tail_of(&p.output.lock().unwrap(), max);
+        let out = tail_of(&p.output.lock_safe(), max);
         Ok(format!("Commande « {} » : {state}.\n{}", p.command, if out.is_empty() { "(aucune sortie pour l'instant)".into() } else { out }))
     }
 
     pub fn stop(&self, id: &str) -> Result<(), String> {
         let p = self.get(id)?;
-        if p.code.lock().unwrap().is_some() {
+        if p.code.lock_safe().is_some() {
             return Ok(());
         }
-        *p.stopped_by_user.lock().unwrap() = true;
+        *p.stopped_by_user.lock_safe() = true;
         p.stop.notify_one();
         Ok(())
     }
 
     /// Arrête tout de suite (fermeture de l'application, changement de profil) : sans attendre les tâches asynchrones.
     pub fn stop_all(&self) {
-        for p in self.procs.lock().unwrap().values() {
-            if p.code.lock().unwrap().is_none() {
+        for p in self.procs.lock_safe().values() {
+            if p.code.lock_safe().is_none() {
                 if let Some(pid) = p.pid {
                     kill_tree(pid);
                 }
-                *p.stopped_by_user.lock().unwrap() = true;
+                *p.stopped_by_user.lock_safe() = true;
             }
         }
     }
@@ -176,14 +177,14 @@ impl Registry {
             .iter()
             .map(|(id, p)| {
                 // Une seule prise du verrou : le reverrouiller dans la même expression bloquerait pour toujours.
-                let code = *p.code.lock().unwrap();
+                let code = *p.code.lock_safe();
                 ProcInfo {
                     id: id.clone(),
                     command: p.command.clone(),
                     running: code.is_none(),
                     code,
                     started_ms: p.started_ms,
-                    tail: tail_of(&p.output.lock().unwrap(), 600),
+                    tail: tail_of(&p.output.lock_safe(), 600),
                 }
             })
             .collect();
@@ -193,7 +194,7 @@ impl Registry {
 
     /// Oublie les commandes terminées.
     pub fn clear_finished(&self) {
-        self.procs.lock().unwrap().retain(|_, p| p.code.lock().unwrap().is_none());
+        self.procs.lock_safe().retain(|_, p| p.code.lock_safe().is_none());
     }
 }
 

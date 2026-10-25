@@ -4,6 +4,7 @@ pub mod project;
 pub mod sandbox;
 pub mod tools;
 
+use crate::sync::MutexExt;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -621,7 +622,7 @@ async fn run_meta<H: Host>(ctx: &Ctx<'_, H>, state: &AgentState, p: &RunParams, 
         }
         "screenshot" => {
             let (png, text) = tokio::task::spawn_blocking(system::screenshot).await.map_err(|e| e.to_string())??;
-            state.pending_images.lock().unwrap().push(png);
+            state.pending_images.lock_safe().push(png);
             Ok(text)
         }
         "computer" => {
@@ -757,7 +758,7 @@ pub async fn run<H: Host>(
     p: RunParams,
 ) -> Result<(), OllamaError> {
     let result = run_loop(&app, &client, &state, &hub, &p, None).await;
-    state.inbox.lock().unwrap().remove(&p.request_id);
+    state.inbox.lock_safe().remove(&p.request_id);
     result?;
     app.emit_json(
         "chat:chunk",
@@ -800,8 +801,8 @@ fn run_loop<'a, H: Host>(
         let mut last_prompt = 0usize;
 
         if agent.is_none() && p.depth == 0 {
-            *state.work.lock().unwrap() = Work::default();
-            state.inbox.lock().unwrap().remove(&p.request_id);
+            *state.work.lock_safe() = Work::default();
+            state.inbox.lock_safe().remove(&p.request_id);
         }
         let top = agent.is_none() && p.depth == 0;
         let mut finished = false;
@@ -814,7 +815,7 @@ fn run_loop<'a, H: Host>(
             }
             // Précisions ajoutées par l'utilisateur pendant la tâche : elles rejoignent la conversation à cette étape.
             if top {
-                let incoming = state.inbox.lock().unwrap().remove(&p.request_id).unwrap_or_default();
+                let incoming = state.inbox.lock_safe().remove(&p.request_id).unwrap_or_default();
                 for text in incoming {
                     app.emit_json("agent:injected", json!({ "id": p.request_id, "text": text }));
                     msgs.push(ChatMessage {
@@ -875,7 +876,7 @@ fn run_loop<'a, H: Host>(
             }
             if calls.is_empty() {
                 // Une précision est arrivée pendant la réponse : le modèle la reçoit avant de conclure.
-                if top && state.inbox.lock().unwrap().get(&p.request_id).is_some_and(|v| !v.is_empty()) {
+                if top && state.inbox.lock_safe().get(&p.request_id).is_some_and(|v| !v.is_empty()) {
                     msgs.push(ChatMessage { role: "assistant".into(), content, thinking: None, tool_calls: None, tool_name: None, images: None });
                     continue;
                 }
@@ -885,7 +886,7 @@ fn run_loop<'a, H: Host>(
                     && !plan
                     && p.workspace.as_deref().is_some_and(|w| project::command_for(w, "check").is_some())
                     && {
-                        let mut w = state.work.lock().unwrap();
+                        let mut w = state.work.lock_safe();
                         let due = w.modified && w.verified != Some(true) && w.nudges < 2;
                         if due {
                             w.nudges += 1;
@@ -937,7 +938,7 @@ fn run_loop<'a, H: Host>(
                 });
             }
             // Les captures d'écran voyagent dans un message « utilisateur » : c'est là que les modèles à vision lisent les images.
-            let shots: Vec<String> = std::mem::take(&mut *state.pending_images.lock().unwrap());
+            let shots: Vec<String> = std::mem::take(&mut *state.pending_images.lock_safe());
             if !shots.is_empty() {
                 msgs.push(ChatMessage {
                     role: "user".into(), content: "(Capture d'écran demandée par ton outil screenshot.)".into(), thinking: None,
@@ -1105,7 +1106,7 @@ async fn handle_call<H: Host>(
     let root = tool_root(p);
     let untrusted_code = p.mode == "auto"
         && matches!(&prepared, Prepared::Exec { command } | Prepared::Spawn { command } if tools::runs_project_code(command))
-        && root.as_ref().is_some_and(|r| !state.trusted.lock().unwrap().contains(r));
+        && root.as_ref().is_some_and(|r| !state.trusted.lock_safe().contains(r));
     if needs_approval(&p.mode, &prepared) || untrusted_code {
         let (tx, rx) = oneshot::channel();
         state.approvals.lock().await.insert(call_id.to_string(), tx);
@@ -1119,7 +1120,7 @@ async fn handle_call<H: Host>(
         }
         if untrusted_code {
             if let Some(r) = root {
-                state.trusted.lock().unwrap().insert(r);
+                state.trusted.lock_safe().insert(r);
             }
         }
     }
@@ -1190,7 +1191,7 @@ async fn handle_call<H: Host>(
         crate::journal::add(name, args, if result.is_ok() { "done" } else { "error" });
     }
     if agent_is_main(ctx) {
-        let mut w = state.work.lock().unwrap();
+        let mut w = state.work.lock_safe();
         match (&result, name) {
             (Ok(_), "write_file" | "edit_file" | "make_dir" | "move_path" | "delete_path") => {
                 w.modified = true;
@@ -1237,7 +1238,7 @@ mod tests {
         impl Host for Arc<TestHost> {
             fn emit_json(&self, event: &str, payload: Value) {
                 if event == "agent:tool" && payload["state"] != "running" {
-                    self.0.lock().unwrap().push(format!(
+                    self.0.lock_safe().push(format!(
                         "{} {} -> {}",
                         payload["name"], payload["args"], payload["state"]
                     ));
@@ -1273,7 +1274,7 @@ mod tests {
         let client = OllamaClient::cloud(&key).unwrap();
         let state = Arc::new(AgentState::default());
         run(host.clone(), client, state.clone(), Arc::new(McpHub::default()), params).await.unwrap();
-        println!("--- appels d'outils ---\n{}", host.0.lock().unwrap().join("\n"));
+        println!("--- appels d'outils ---\n{}", host.0.lock_safe().join("\n"));
 
         let calc = std::fs::read_to_string(dir.join("calc.js")).unwrap();
         println!("--- calc.js final ---\n{calc}");
@@ -1286,7 +1287,7 @@ mod tests {
     struct RecHost(std::sync::Mutex<Vec<(String, Value)>>);
     impl Host for Arc<RecHost> {
         fn emit_json(&self, event: &str, payload: Value) {
-            self.0.lock().unwrap().push((event.to_string(), payload));
+            self.0.lock_safe().push((event.to_string(), payload));
         }
         fn remember(&self, _: &str) -> Result<(), String> {
             Ok(())
@@ -1362,7 +1363,7 @@ mod tests {
         let client = OllamaClient::for_test(fake_ollama().await);
         run(host.clone(), client, Arc::new(AgentState::default()), Arc::new(McpHub::default()), params).await.unwrap();
 
-        let events = host.0.lock().unwrap();
+        let events = host.0.lock_safe();
         let tools: Vec<&Value> = events.iter().filter(|(e, _)| e == "agent:tool").map(|(_, p)| p).collect();
         let done: Vec<&&Value> = tools.iter().filter(|p| p["name"] == "delegate" && p["state"] == "done").collect();
         assert_eq!(done.len(), 2, "deux délégations terminées : {tools:?}");
@@ -1404,7 +1405,7 @@ mod tests {
                     continue;
                 }
                 let index = {
-                    let mut l = log.lock().unwrap();
+                    let mut l = log.lock_safe();
                     l.push(body);
                     l.len() - 1
                 };
@@ -1453,11 +1454,11 @@ mod tests {
         let state = Arc::new(AgentState::default());
         run(host.clone(), OllamaClient::for_test(url), state.clone(), Arc::new(McpHub::default()), params).await.unwrap();
 
-        let reqs = seen.lock().unwrap();
+        let reqs = seen.lock_safe();
         assert_eq!(reqs.len(), 4, "écriture, conclusion trop tôt, vérification, conclusion");
         let reminder = reqs[2]["messages"].as_array().unwrap().iter().any(|m| m["role"] == "user" && m["content"].as_str().is_some_and(|c| c.starts_with("(Rappel automatique)")));
         assert!(reminder, "le rappel doit figurer dans la 3e requête");
-        let events = host.0.lock().unwrap();
+        let events = host.0.lock_safe();
         assert!(events.iter().any(|(e, p)| e == "agent:tool" && p["name"] == "verify" && p["state"] == "done"));
         let shown: String = events.iter().filter(|(e, _)| e == "chat:chunk").filter_map(|(_, p)| p["chunk"]["content"].as_str()).collect();
         assert_eq!(shown, "C'est fait.\n\nVérifié.", "les textes de deux étapes ne doivent pas se coller");
@@ -1475,8 +1476,8 @@ mod tests {
     struct TypingHost(Arc<RecHost>, Arc<AgentState>);
     impl Host for TypingHost {
         fn emit_json(&self, event: &str, payload: Value) {
-            if event == "agent:tool" && self.1.inbox.lock().unwrap().is_empty() && !self.0 .0.lock().unwrap().iter().any(|(e, _)| e == "agent:injected") {
-                self.1.inbox.lock().unwrap().entry("i1".into()).or_default().push("Mets plutôt « bonjour ».".into());
+            if event == "agent:tool" && self.1.inbox.lock_safe().is_empty() && !self.0 .0.lock_safe().iter().any(|(e, _)| e == "agent:injected") {
+                self.1.inbox.lock_safe().entry("i1".into()).or_default().push("Mets plutôt « bonjour ».".into());
             }
             self.0.emit_json(event, payload);
         }
@@ -1512,11 +1513,11 @@ mod tests {
             project_id: None,
         };
         run(TypingHost(rec.clone(), state.clone()), OllamaClient::for_test(url), state.clone(), Arc::new(McpHub::default()), params).await.unwrap();
-        let reqs = seen.lock().unwrap();
+        let reqs = seen.lock_safe();
         assert_eq!(reqs.len(), 2, "la tâche continue sans repartir de zéro");
         let has = |r: &Value| r["messages"].as_array().unwrap().iter().any(|m| m["role"] == "user" && m["content"].as_str().is_some_and(|c| c.contains("Mets plutôt « bonjour »")));
         assert!(!has(&reqs[0]) && has(&reqs[1]), "la précision rejoint la conversation à l'étape suivante");
-        assert!(rec.0.lock().unwrap().iter().any(|(e, p)| e == "agent:injected" && p["text"] == "Mets plutôt « bonjour »."));
+        assert!(rec.0.lock_safe().iter().any(|(e, p)| e == "agent:injected" && p["text"] == "Mets plutôt « bonjour »."));
         let _ = std::fs::remove_dir_all(dir);
     }
 
@@ -1538,11 +1539,11 @@ mod tests {
     impl Host for Arc<MemHost> {
         fn emit_json(&self, _: &str, _: Value) {}
         fn remember(&self, text: &str) -> Result<(), String> {
-            self.0.lock().unwrap().push(format!("global:{text}"));
+            self.0.lock_safe().push(format!("global:{text}"));
             Ok(())
         }
         fn remember_in(&self, text: &str, project: Option<&str>) -> Result<(), String> {
-            self.0.lock().unwrap().push(format!("{}:{text}", project.unwrap_or("global")));
+            self.0.lock_safe().push(format!("{}:{text}", project.unwrap_or("global")));
             Ok(())
         }
         fn search_chats(&self, query: &str) -> Result<String, String> {
@@ -1579,7 +1580,7 @@ mod tests {
                         }
                     };
                     let done = body["messages"].as_array().unwrap().iter().any(|m| m["role"] == "tool");
-                    log.lock().unwrap().push(body);
+                    log.lock_safe().push(body);
                     let call = |name: &str, args: Value| json!({ "function": { "name": name, "arguments": args } });
                     let reply = if done {
                         json!({ "message": { "role": "assistant", "content": "Voilà." }, "done": true })
@@ -1618,7 +1619,7 @@ mod tests {
         };
         let state = Arc::new(AgentState::default());
         run(host.clone(), OllamaClient::for_test(url), state, Arc::new(McpHub::default()), params).await.unwrap();
-        let reqs = seen.lock().unwrap();
+        let reqs = seen.lock_safe();
         assert_eq!(reqs.len(), 2, "aucune approbation ne doit bloquer ces outils, même en mode manuel");
         let names: Vec<&str> = reqs[0]["tools"].as_array().unwrap().iter().filter_map(|t| t["function"]["name"].as_str()).collect();
         assert!(names.contains(&"search_project_docs") && names.contains(&"search_chats") && names.contains(&"remember"), "{names:?}");
@@ -1626,7 +1627,7 @@ mod tests {
         assert!(tool_text.contains("préavis de trois mois"), "{tool_text}");
         assert!(tool_text.contains("Billets de train"), "{tool_text}");
         assert!(tool_text.contains("Mémorisé pour ce projet."), "{tool_text}");
-        assert_eq!(host.0.lock().unwrap().as_slice(), ["proj-1:Budget 2000 €"]);
+        assert_eq!(host.0.lock_safe().as_slice(), ["proj-1:Budget 2000 €"]);
     }
 
     #[tokio::test]
@@ -1707,7 +1708,7 @@ mod tests {
         });
         run(host.clone(), OllamaClient::for_test(url), state.clone(), Arc::new(McpHub::default()), params).await.unwrap();
         answering.abort();
-        let asked = host.0.lock().unwrap().iter().filter(|(e, p)| e == "agent:tool" && p["state"] == "awaiting").count();
+        let asked = host.0.lock_safe().iter().filter(|(e, p)| e == "agent:tool" && p["state"] == "awaiting").count();
         assert_eq!(asked, 1, "l'accord est demandé la première fois seulement, pas à la seconde commande");
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1743,7 +1744,7 @@ mod tests {
                         }
                     };
                     let done = body["messages"].as_array().unwrap().iter().any(|m| m["role"] == "tool");
-                    log.lock().unwrap().push(body);
+                    log.lock_safe().push(body);
                     let reply = if done {
                         json!({ "message": { "role": "assistant", "content": "Voilà." }, "done": true })
                     } else {
@@ -1806,7 +1807,7 @@ mod tests {
         run(host.clone(), OllamaClient::for_test(url), state, Arc::new(McpHub::default()), params).await.unwrap();
         answering.abort();
 
-        let events = host.0.lock().unwrap().clone();
+        let events = host.0.lock_safe().clone();
         let awaiting: Vec<&Value> = events.iter().filter(|(e, p)| e == "agent:tool" && p["state"] == "awaiting").map(|(_, p)| p).collect();
         assert_eq!(awaiting.len(), 1, "l'accord est demandé, même en « Ignorer les permissions »");
         let shown = &awaiting[0]["args"];
@@ -1816,7 +1817,7 @@ mod tests {
         assert!(!shown.to_string().contains("MOT-DE-PASSE-AGENT-42"), "le mot de passe ne figure pas dans la demande");
 
         // Ce que le modèle a reçu, du début à la fin : jamais le mot de passe.
-        let everything = serde_json::to_string(&*seen.lock().unwrap()).unwrap();
+        let everything = serde_json::to_string(&*seen.lock_safe()).unwrap();
         assert!(!everything.contains("MOT-DE-PASSE-AGENT-42"), "le mot de passe ne doit jamais atteindre le modèle");
         assert!(everything.contains("navigateur n'est pas ouvert"), "le modèle apprend pourquoi la connexion a échoué");
         let results: Vec<&Value> = events.iter().filter(|(e, p)| e == "agent:tool" && p["name"] == "vault_login" && p["state"] == "error").map(|(_, p)| p).collect();

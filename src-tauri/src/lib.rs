@@ -1,4 +1,5 @@
 mod agent;
+mod sync;
 mod agents;
 mod git;
 mod history;
@@ -34,6 +35,7 @@ mod webprint {
     }
 }
 
+use crate::sync::MutexExt;
 use std::{collections::HashMap, sync::Arc};
 
 use history::{Conversation, History, Memory, Project, ProjectDoc, StoredMessage};
@@ -94,11 +96,11 @@ struct TaskSpec {
 impl AppState {
     /// État de l'agent de la fenêtre `label` (créé au premier besoin).
     fn agent_of(&self, label: &str) -> Arc<agent::AgentState> {
-        self.agents.lock().unwrap().entry(label.to_string()).or_default().clone()
+        self.agents.lock_safe().entry(label.to_string()).or_default().clone()
     }
 
     fn all_agents(&self) -> Vec<Arc<agent::AgentState>> {
-        self.agents.lock().unwrap().values().cloned().collect()
+        self.agents.lock_safe().values().cloned().collect()
     }
 }
 
@@ -272,7 +274,7 @@ async fn agent_inject(window: tauri::Window, state: State<'_, AppState>, request
     if text.trim().is_empty() || !state.running.lock().await.contains_key(&request_id) {
         return Ok(false);
     }
-    state.agent_of(window.label()).inbox.lock().unwrap().entry(request_id).or_default().push(text.trim().to_string());
+    state.agent_of(window.label()).inbox.lock_safe().entry(request_id).or_default().push(text.trim().to_string());
     Ok(true)
 }
 
@@ -456,7 +458,7 @@ async fn window_new(app: AppHandle, state: State<'_, AppState>, task: Option<Tas
     }
     let label = format!("win-{}", &uuid::Uuid::new_v4().simple().to_string()[..8]);
     if let Some(t) = task {
-        state.tasks.lock().unwrap().insert(label.clone(), t);
+        state.tasks.lock_safe().insert(label.clone(), t);
     }
     tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("index.html".into()))
         .title("Lama Desktop")
@@ -472,7 +474,7 @@ async fn window_new(app: AppHandle, state: State<'_, AppState>, task: Option<Tas
 /// Tâche à démarrer dans cette fenêtre (lancée depuis le tableau des agents), une seule fois.
 #[tauri::command]
 fn window_task(window: tauri::Window, state: State<'_, AppState>) -> Option<TaskSpec> {
-    state.tasks.lock().unwrap().remove(window.label())
+    state.tasks.lock_safe().remove(window.label())
 }
 
 /// Chaque fenêtre dit ce qu'elle fait ; le tableau des agents les affiche toutes.
@@ -480,14 +482,14 @@ fn window_task(window: tauri::Window, state: State<'_, AppState>) -> Option<Task
 fn board_report(window: tauri::Window, state: State<'_, AppState>, entry: BoardEntry) {
     let mut e = entry;
     e.label = window.label().to_string();
-    state.board.lock().unwrap().insert(e.label.clone(), e);
+    state.board.lock_safe().insert(e.label.clone(), e);
 }
 
 #[tauri::command]
 fn board_list(app: AppHandle, state: State<'_, AppState>) -> Vec<BoardEntry> {
     // Les fenêtres d'impression PDF (cachées, éphémères) n'ont rien à faire dans le tableau.
     let open: HashMap<String, tauri::WebviewWindow> = app.webview_windows().into_iter().filter(|(l, _)| !l.starts_with("pdf-")).collect();
-    let mut board = state.board.lock().unwrap();
+    let mut board = state.board.lock_safe();
     board.retain(|label, _| open.contains_key(label));
     let mut out: Vec<BoardEntry> = open
         .keys()
@@ -864,9 +866,15 @@ async fn data_backup(app: AppHandle, db: Db<'_>, path: String) -> Result<usize, 
     result
 }
 
+/// Serveurs MCP que la sauvegarde ajouterait (à montrer à l'utilisateur avant de les restaurer).
+#[tauri::command]
+async fn data_restore_preview(path: String) -> Result<Vec<String>, String> {
+    tokio::task::spawn_blocking(move || backup::mcp_in_archive(std::path::Path::new(&path))).await.map_err(|e| e.to_string())?
+}
+
 /// Restaure une sauvegarde dans le profil ouvert : ses données actuelles sont remplacées (l'ancienne base est gardée à côté).
 #[tauri::command]
-async fn data_restore(app: AppHandle, state: State<'_, AppState>, db: Db<'_>, path: String) -> Result<usize, String> {
+async fn data_restore(app: AppHandle, state: State<'_, AppState>, db: Db<'_>, path: String, with_mcp: Option<bool>) -> Result<usize, String> {
     if !state.running.lock().await.is_empty() {
         return Err("Une génération est en cours : arrête-la avant de restaurer.".into());
     }
@@ -874,7 +882,7 @@ async fn data_restore(app: AppHandle, state: State<'_, AppState>, db: Db<'_>, pa
     // La base ouverte est refermée avant d'être remplacée.
     *db.lock().map_err(|e| e.to_string())? = History::in_memory().map_err(db_err)?;
     let target = dir.clone();
-    let count = tokio::task::spawn_blocking(move || backup::restore(std::path::Path::new(&path), &target)).await.map_err(|e| e.to_string());
+    let count = tokio::task::spawn_blocking(move || backup::restore(std::path::Path::new(&path), &target, with_mcp.unwrap_or(false))).await.map_err(|e| e.to_string());
     let reopened = History::open(&dir.join("history.db")).map_err(db_err)?;
     *db.lock().map_err(|e| e.to_string())? = reopened;
     count?
@@ -1199,38 +1207,38 @@ fn skill_create(app: AppHandle, name: String, description: String) -> Result<Str
 
 #[tauri::command]
 fn memory_list(db: Db) -> Result<Vec<Memory>, String> {
-    db.lock().unwrap().list_memories().map_err(db_err)
+    db.lock_safe().list_memories().map_err(db_err)
 }
 
 #[tauri::command]
 fn memory_add(db: Db, text: String, project_id: Option<String>) -> Result<Memory, String> {
-    db.lock().unwrap().add_memory_in(text.trim(), project_id.as_deref().filter(|p| !p.is_empty())).map_err(db_err)
+    db.lock_safe().add_memory_in(text.trim(), project_id.as_deref().filter(|p| !p.is_empty())).map_err(db_err)
 }
 
 /// Mémoire propre à un projet.
 #[tauri::command]
 fn memory_project_list(db: Db, project_id: String) -> Result<Vec<Memory>, String> {
-    db.lock().unwrap().list_memories_of(Some(&project_id)).map_err(db_err)
+    db.lock_safe().list_memories_of(Some(&project_id)).map_err(db_err)
 }
 
 #[tauri::command]
 fn memory_delete(db: Db, id: i64) -> Result<(), String> {
-    db.lock().unwrap().delete_memory(id).map_err(db_err)
+    db.lock_safe().delete_memory(id).map_err(db_err)
 }
 
 #[tauri::command]
 fn project_docs(db: Db, project_id: String) -> Result<Vec<ProjectDoc>, String> {
-    db.lock().unwrap().list_docs(&project_id).map_err(db_err)
+    db.lock_safe().list_docs(&project_id).map_err(db_err)
 }
 
 #[tauri::command]
 fn project_doc_add(db: Db, project_id: String, name: String, content: String) -> Result<ProjectDoc, String> {
-    db.lock().unwrap().add_doc(&project_id, &name, &content).map_err(db_err)
+    db.lock_safe().add_doc(&project_id, &name, &content).map_err(db_err)
 }
 
 #[tauri::command]
 fn project_doc_delete(db: Db, id: String) -> Result<(), String> {
-    db.lock().unwrap().delete_doc(&id).map_err(db_err)
+    db.lock_safe().delete_doc(&id).map_err(db_err)
 }
 
 /// Réponse complète sans streaming (résumés de compactage).
@@ -1582,89 +1590,89 @@ fn conv_create(
     workspace: Option<String>,
     project_id: Option<String>,
 ) -> Result<Conversation, String> {
-    db.lock().unwrap().create(&model, &kind, workspace.as_deref(), project_id.as_deref()).map_err(db_err)
+    db.lock_safe().create(&model, &kind, workspace.as_deref(), project_id.as_deref()).map_err(db_err)
 }
 
 #[tauri::command]
 fn conv_list(db: Db, search: String, kind: String, project_id: Option<String>) -> Result<Vec<Conversation>, String> {
-    db.lock().unwrap().list(&search, &kind, project_id.as_deref()).map_err(db_err)
+    db.lock_safe().list(&search, &kind, project_id.as_deref()).map_err(db_err)
 }
 
 #[tauri::command]
 fn project_create(db: Db, name: String, instructions: String, kind: Option<String>, workspace: Option<String>) -> Result<Project, String> {
     let kind = if kind.as_deref() == Some("code") { "code" } else { "chat" };
-    db.lock().unwrap().create_project(&name, &instructions, kind, workspace.as_deref().filter(|w| !w.trim().is_empty())).map_err(db_err)
+    db.lock_safe().create_project(&name, &instructions, kind, workspace.as_deref().filter(|w| !w.trim().is_empty())).map_err(db_err)
 }
 
 #[tauri::command]
 fn project_list(db: Db) -> Result<Vec<Project>, String> {
-    db.lock().unwrap().list_projects().map_err(db_err)
+    db.lock_safe().list_projects().map_err(db_err)
 }
 
 #[tauri::command]
 fn project_update(db: Db, id: String, name: String, instructions: String, workspace: Option<String>) -> Result<(), String> {
-    db.lock().unwrap().update_project(&id, &name, &instructions, workspace.as_deref().filter(|w| !w.trim().is_empty())).map_err(db_err)
+    db.lock_safe().update_project(&id, &name, &instructions, workspace.as_deref().filter(|w| !w.trim().is_empty())).map_err(db_err)
 }
 
 #[tauri::command]
 fn project_delete(db: Db, id: String) -> Result<(), String> {
-    db.lock().unwrap().delete_project(&id).map_err(db_err)
+    db.lock_safe().delete_project(&id).map_err(db_err)
 }
 
 #[tauri::command]
 fn artifact_save(db: Db, conv_id: Option<String>, title: String, lang: String, kind: String, code: String) -> Result<history::SavedArtifact, String> {
-    db.lock().unwrap().save_artifact(conv_id.as_deref(), &title, &lang, &kind, &code).map_err(db_err)
+    db.lock_safe().save_artifact(conv_id.as_deref(), &title, &lang, &kind, &code).map_err(db_err)
 }
 
 #[tauri::command]
 fn artifact_list(db: Db, search: String) -> Result<Vec<history::SavedArtifact>, String> {
-    db.lock().unwrap().list_artifacts(&search).map_err(db_err)
+    db.lock_safe().list_artifacts(&search).map_err(db_err)
 }
 
 #[tauri::command]
 fn artifact_delete(db: Db, id: String) -> Result<(), String> {
-    db.lock().unwrap().delete_artifact(&id).map_err(db_err)
+    db.lock_safe().delete_artifact(&id).map_err(db_err)
 }
 
 #[tauri::command]
 fn project_pin(db: Db, id: String, pinned: bool) -> Result<(), String> {
-    db.lock().unwrap().set_project_pinned(&id, pinned).map_err(db_err)
+    db.lock_safe().set_project_pinned(&id, pinned).map_err(db_err)
 }
 
 #[tauri::command]
 fn conv_pin(db: Db, id: String, pinned: bool) -> Result<(), String> {
-    db.lock().unwrap().set_pinned(&id, pinned).map_err(db_err)
+    db.lock_safe().set_pinned(&id, pinned).map_err(db_err)
 }
 
 /// Nouvelle conversation = copie de celle-ci jusqu'au message `upto` (exclu).
 #[tauri::command]
 fn conv_fork(db: Db, id: String, upto: usize) -> Result<Conversation, String> {
-    db.lock().unwrap().fork(&id, upto).map_err(db_err)
+    db.lock_safe().fork(&id, upto).map_err(db_err)
 }
 
 #[tauri::command]
 fn conv_set_project(db: Db, id: String, project_id: Option<String>) -> Result<(), String> {
-    db.lock().unwrap().set_conversation_project(&id, project_id.as_deref()).map_err(db_err)
+    db.lock_safe().set_conversation_project(&id, project_id.as_deref()).map_err(db_err)
 }
 
 #[tauri::command]
 fn conv_messages(db: Db, id: String) -> Result<Vec<StoredMessage>, String> {
-    db.lock().unwrap().messages(&id).map_err(db_err)
+    db.lock_safe().messages(&id).map_err(db_err)
 }
 
 #[tauri::command]
 fn conv_save(db: Db, id: String, model: String, messages: Vec<StoredMessage>) -> Result<(), String> {
-    db.lock().unwrap().save_messages(&id, &model, &messages).map_err(db_err)
+    db.lock_safe().save_messages(&id, &model, &messages).map_err(db_err)
 }
 
 #[tauri::command]
 fn conv_rename(db: Db, id: String, title: String) -> Result<(), String> {
-    db.lock().unwrap().rename(&id, &title).map_err(db_err)
+    db.lock_safe().rename(&id, &title).map_err(db_err)
 }
 
 #[tauri::command]
 fn conv_delete(db: Db, id: String) -> Result<(), String> {
-    db.lock().unwrap().delete(&id).map_err(db_err)
+    db.lock_safe().delete(&id).map_err(db_err)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -1770,8 +1778,8 @@ pub fn run() {
             if let tauri::WindowEvent::Destroyed = event {
                 let app = window.app_handle();
                 let state = app.state::<AppState>();
-                state.board.lock().unwrap().remove(window.label());
-                if let Some(agent) = state.agents.lock().unwrap().remove(window.label()) {
+                state.board.lock_safe().remove(window.label());
+                if let Some(agent) = state.agents.lock_safe().remove(window.label()) {
                     agent.background.stop_all();
                 }
                 // La fenêtre principale fermée, l'application s'arrête (les autres fenêtres se ferment avec elle).
@@ -1791,7 +1799,7 @@ pub fn run() {
             skill_set_enabled, skills_auto_import, skills_import, skills_hub_browse, skills_hub_fetch,
             memory_list, memory_add, memory_delete, memory_project_list,
             notify_os, browser_status, browser_launch_ui, browser_close_ui, browser_wipe, vault_browser_login, vault_status, vault_create, vault_unlock, vault_lock, vault_list, vault_login_get, vault_login_save, vault_login_delete, vault_info_save, vault_info_delete, vault_generate, vault_set_agent_access, vault_change_master, vault_destroy, vault_copy, vault_fill_ui, schedules_list, schedule_save, schedule_delete, schedule_done,
-            data_backup, data_restore, data_export_chats, data_erase,
+            data_backup, data_restore, data_restore_preview, data_export_chats, data_erase,
             project_docs, project_doc_add, project_doc_delete,
             chat_once, mcp_add, mcp_add_custom, mcp_import, mcp_remove,
             secret_get, secret_set, save_text, git_status, git_diff, git_commit,

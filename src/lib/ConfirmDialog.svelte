@@ -24,7 +24,7 @@
 
 <style>
   .small { max-width: 420px; gap: 16px; }
-  p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+  p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; }
   .row { display: flex; justify-content: flex-end; gap: 8px; }
   button { border: 1px solid var(--border); background: var(--surface); border-radius: 9px; padding: 7px 16px; }
   button:hover { border-color: var(--accent); }

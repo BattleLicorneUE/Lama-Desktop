@@ -2,7 +2,7 @@
 
 Application de bureau pour Windows qui sert de poste de travail avec les modèles **Ollama Cloud** : discussion, projets, agent capable de travailler sur ton ordinateur, gestionnaire de mots de passe, tâches planifiées et plus encore. Tout se passe dans une seule fenêtre, en français.
 
-> Projet personnel en version 0.1.0. Windows uniquement pour l'instant.
+> Projet personnel en version 0.2.0. Windows uniquement pour l'instant.
 
 ## Ce que fait l'application
 
@@ -57,7 +57,7 @@ Une notification apparaît quand Lama a fini de répondre ou de travailler et qu
 ## Installation
 
 ### Utiliser l'application
-Prends l'installeur Windows (`Lama Desktop_0.1.0_x64-setup.exe` ou le `.msi`) généré par la compilation, voir ci-dessous. Il faut un compte [Ollama](https://ollama.com) et une clé API, qui est demandée à la fin du tutoriel.
+Prends l'installeur Windows (`Lama Desktop_<version>_x64-setup.exe` ou le `.msi`) généré par la compilation, voir ci-dessous. Il faut un compte [Ollama](https://ollama.com) et une clé API, qui est demandée à la fin du tutoriel.
 
 ### Compiler soi-même
 Prérequis : [Node.js](https://nodejs.org) LTS, [Rust](https://rustup.rs) avec les outils de compilation C++ de Visual Studio, et WebView2 (déjà présent sur Windows 11).
@@ -91,7 +91,7 @@ git push origin main v0.2.0
 
 3. Le workflow `.github/workflows/release.yml` compile, signe et publie l'installeur et `latest.json`.
 
-Mise en place unique : ajouter dans Settings → Secrets and variables → Actions les secrets `TAURI_SIGNING_PRIVATE_KEY` (contenu du fichier de clé privée) et `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (vide si la clé n'a pas de mot de passe). Le dépôt doit être public pour que les applications puissent lire les Releases. Ne perds jamais la clé privée et ne la mets jamais dans le dépôt.
+Mise en place unique (recommandé : créer l'environnement GitHub `release` dans Settings → Environments, y exiger une validation manuelle et y mettre les secrets, pour qu'un tag seul ne suffise pas à signer une version) : ajouter dans Settings → Secrets and variables → Actions les secrets `TAURI_SIGNING_PRIVATE_KEY` (contenu du fichier de clé privée) et `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (vide si la clé n'a pas de mot de passe). Le dépôt doit être public pour que les applications puissent lire les Releases. Ne perds jamais la clé privée et ne la mets jamais dans le dépôt.
 
 ## Technologies
 - **Tauri 2** et **Rust** pour le cœur de l'application (agent, coffre, navigateur, base SQLite).
@@ -117,5 +117,7 @@ Mise en place unique : ajouter dans Settings → Secrets and variables → Actio
 - Les pages affichées sont nettoyées (DOMPurify) et la politique de sécurité du contenu est restrictive.
 - Les accès web refusent les adresses locales et privées, y compris après redirection.
 - Aucune télémétrie.
+- Restaurer une sauvegarde ne rétablit les serveurs MCP (qui lancent des programmes) qu'après ton accord explicite ; l'extraction est limitée en taille et ne touche pas au profil si l'archive est invalide.
+- Les aperçus (React, Mermaid) utilisent des bibliothèques livrées avec l'application ; les actions de la CI sont épinglées sur un commit précis.
 
 Pour signaler un problème de sécurité, ouvre une issue sans y mettre d'information sensible.

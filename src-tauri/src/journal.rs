@@ -1,6 +1,7 @@
 //! Journal des actions de l'agent sur le PC (commandes, fichiers, souris, presse-papiers…), pour savoir après coup ce qui s'est passé.
 //! Une ligne JSON par action, dans le dossier du profil. Le contenu saisi ou copié n'est jamais enregistré, seulement sa taille.
 
+use crate::sync::MutexExt;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -23,7 +24,7 @@ pub struct Entry {
 }
 
 pub fn set_file(path: Option<PathBuf>) {
-    *FILE.lock().unwrap() = path;
+    *FILE.lock_safe() = path;
 }
 
 /// Les outils dont on garde la trace : tout ce qui agit (pas les simples lectures de fichiers).
@@ -75,7 +76,7 @@ pub fn summarize(tool: &str, args: &Value) -> String {
 }
 
 pub fn add(tool: &str, args: &Value, outcome: &str) {
-    let guard = FILE.lock().unwrap();
+    let guard = FILE.lock_safe();
     let Some(path) = guard.as_ref() else { return };
     let entry = Entry {
         t: SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs()),
@@ -92,7 +93,7 @@ pub fn add(tool: &str, args: &Value, outcome: &str) {
 
 /// Les `limit` dernières actions, la plus récente d'abord.
 pub fn list(limit: usize) -> Vec<Entry> {
-    let guard = FILE.lock().unwrap();
+    let guard = FILE.lock_safe();
     let Some(path) = guard.as_ref() else { return vec![] };
     let text = std::fs::read_to_string(path).unwrap_or_default();
     let mut all: Vec<Entry> = text.lines().filter_map(|l| serde_json::from_str(l).ok()).collect();
@@ -107,7 +108,7 @@ pub fn list(limit: usize) -> Vec<Entry> {
 }
 
 pub fn clear() {
-    if let Some(path) = FILE.lock().unwrap().as_ref() {
+    if let Some(path) = FILE.lock_safe().as_ref() {
         let _ = std::fs::remove_file(path);
     }
 }

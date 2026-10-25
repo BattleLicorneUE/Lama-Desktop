@@ -2,6 +2,7 @@
 //! Les tâches vivent dans le profil ; l'interface calcule la prochaine échéance (heure locale), ce module la conserve
 //! et signale les tâches échues tant que l'application est ouverte. Une tâche manquée est lancée à la réouverture.
 
+use crate::sync::MutexExt;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -37,7 +38,7 @@ pub struct Task {
 static FILE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 pub fn set_file(path: Option<PathBuf>) {
-    *FILE.lock().unwrap() = path;
+    *FILE.lock_safe() = path;
 }
 
 fn now() -> u64 {
@@ -45,7 +46,7 @@ fn now() -> u64 {
 }
 
 fn with<T>(f: impl FnOnce(&mut Vec<Task>) -> T) -> Result<T, String> {
-    let guard = FILE.lock().unwrap();
+    let guard = FILE.lock_safe();
     let path = guard.as_ref().ok_or("Aucun profil ouvert.")?;
     let mut list: Vec<Task> = std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     let out = f(&mut list);

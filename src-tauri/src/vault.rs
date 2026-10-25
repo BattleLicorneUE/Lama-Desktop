@@ -8,6 +8,7 @@
 //!   changement de profil, fermeture de l'application) ;
 //! - le modèle d'IA ne voit jamais un secret : l'agent n'obtient que des titres, et la saisie passe directement par le clavier.
 
+use crate::sync::MutexExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -246,7 +247,7 @@ impl Vault {
 
     /// Fichier du profil ouvert ; verrouille toujours le coffre (on ne garde pas la clé d'un autre profil).
     pub fn set_dir(&self, dir: Option<&Path>) {
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock_safe();
         g.open = None;
         g.failures = 0;
         g.path = dir.map(|d| d.join(FILE));
@@ -257,7 +258,7 @@ impl Vault {
     }
 
     pub fn status(&self) -> Status {
-        let g = self.inner.lock().unwrap();
+        let g = self.inner.lock_safe();
         let exists = g.path.as_ref().is_some_and(|p| p.is_file());
         match &g.open {
             Some(o) => Status {
@@ -274,7 +275,7 @@ impl Vault {
     }
 
     pub fn failures(&self) -> u32 {
-        self.inner.lock().unwrap().failures
+        self.inner.lock_safe().failures
     }
 
     fn write(path: &Path, o: &Open) -> Result<(), String> {
@@ -302,7 +303,7 @@ impl Vault {
     /// Crée le coffre avec un mot de passe maître. Il s'ouvre aussitôt.
     pub fn create(&self, master: &str) -> Result<(), String> {
         check_master(master)?;
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock_safe();
         let path = Self::path(&g)?;
         if path.exists() {
             return Err("Un coffre existe déjà pour ce profil.".into());
@@ -319,7 +320,7 @@ impl Vault {
     }
 
     pub fn unlock(&self, master: &str) -> Result<(), String> {
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock_safe();
         let path = Self::path(&g)?;
         let text = std::fs::read_to_string(&path).map_err(|_| "Aucun coffre pour ce profil.".to_string())?;
         let env: Envelope = serde_json::from_str(&text).map_err(|_| "Coffre illisible (fichier altéré).".to_string())?;
@@ -354,12 +355,12 @@ impl Vault {
     }
 
     pub fn lock(&self) {
-        self.inner.lock().unwrap().open = None;
+        self.inner.lock_safe().open = None;
     }
 
     /// Verrouille si le coffre est resté inutilisé trop longtemps. Renvoie vrai s'il vient de se verrouiller.
     pub fn tick(&self) -> bool {
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock_safe();
         if g.open.as_ref().is_some_and(|o| o.last.elapsed() >= IDLE) {
             g.open = None;
             return true;
@@ -369,7 +370,7 @@ impl Vault {
 
     /// Accès au coffre ouvert (remet le minuteur d'inactivité à zéro).
     fn with<T>(&self, f: impl FnOnce(&mut Data) -> Result<T, String>) -> Result<T, String> {
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock_safe();
         let o = g.open.as_mut().ok_or("Le coffre est verrouillé.")?;
         o.last = Instant::now();
         f(&mut o.data)
@@ -377,7 +378,7 @@ impl Vault {
 
     /// Modifie puis enregistre ; si l'enregistrement échoue, la modification est annulée en mémoire aussi.
     fn change<T>(&self, f: impl FnOnce(&mut Data) -> Result<T, String>) -> Result<T, String> {
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock_safe();
         let before = g.open.as_ref().ok_or("Le coffre est verrouillé.")?.data.clone();
         let out = {
             let o = g.open.as_mut().unwrap();
@@ -469,7 +470,7 @@ impl Vault {
     /// Change le mot de passe maître : nouveau sel, nouvelle clé, tout est rechiffré.
     pub fn change_master(&self, old: &str, new: &str) -> Result<(), String> {
         check_master(new)?;
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock_safe();
         let o = g.open.as_ref().ok_or("Le coffre est verrouillé.")?;
         if *derive(old, &o.salt, o.kdf)? != *o.key {
             g.failures += 1;
@@ -498,13 +499,13 @@ impl Vault {
         if !self.status().unlocked {
             self.unlock(master)?;
         } else {
-            let g = self.inner.lock().unwrap();
+            let g = self.inner.lock_safe();
             let o = g.open.as_ref().unwrap();
             if *derive(master, &o.salt, o.kdf)? != *o.key {
                 return Err("Mot de passe maître incorrect.".into());
             }
         }
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock_safe();
         let path = Self::path(&g)?;
         g.open = None;
         for ext in ["json", "bak", "tmp"] {
@@ -516,7 +517,7 @@ impl Vault {
     // ------------------------------------------------------------ pour l'assistant et la saisie
 
     pub fn agent_ready(&self) -> bool {
-        self.inner.lock().unwrap().open.as_ref().is_some_and(|o| o.data.agent_access)
+        self.inner.lock_safe().open.as_ref().is_some_and(|o| o.data.agent_access)
     }
 
     /// Ce que l'assistant a le droit de voir : titres, sites et identifiants. Jamais un mot de passe ni une note.
@@ -857,7 +858,7 @@ mod tests {
         v.unlock("phrase de passe très longue").unwrap();
         assert!(!v.tick(), "pas verrouillé tant qu'il sert");
         {
-            let mut g = v.inner.lock().unwrap();
+            let mut g = v.inner.lock_safe();
             g.open.as_mut().unwrap().last = Instant::now() - IDLE - Duration::from_secs(1);
         }
         assert!(v.tick() && !v.status().unlocked, "verrouillé après l'inactivité");

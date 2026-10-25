@@ -1,6 +1,7 @@
 //! Rappels programmés par le modèle (« préviens-moi dans 20 minutes »), conservés dans le profil et vérifiés toutes les
 //! quelques secondes tant que l'application est ouverte. Un rappel manqué (appli fermée) sonne à la réouverture.
 
+use crate::sync::MutexExt;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -20,7 +21,7 @@ pub struct Reminder {
 static FILE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 pub fn set_file(path: Option<PathBuf>) {
-    *FILE.lock().unwrap() = path;
+    *FILE.lock_safe() = path;
 }
 
 fn now() -> u64 {
@@ -29,7 +30,7 @@ fn now() -> u64 {
 
 /// Lit, modifie puis réécrit la liste sous verrou.
 fn with<T>(f: impl FnOnce(&mut Vec<Reminder>) -> T) -> Result<T, String> {
-    let guard = FILE.lock().unwrap();
+    let guard = FILE.lock_safe();
     let path = guard.as_ref().ok_or("Aucun profil ouvert.")?;
     let mut list: Vec<Reminder> = std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     let out = f(&mut list);

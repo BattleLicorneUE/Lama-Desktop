@@ -55,43 +55,112 @@ pub fn backup(dir: &Path, db_copy: &Path, out: &Path, profile: &str) -> Result<u
     Ok(count)
 }
 
-/// Restaure une sauvegarde dans le dossier du profil. L'ancienne base est gardée sous `history-avant-restauration.db`.
-pub fn restore(archive: &Path, dir: &Path) -> Result<usize, String> {
+/// Taille décompressée maximale d'une entrée, puis de toute l'archive (protège des « zip bombs »).
+const MAX_ENTRY: u64 = 1 << 30;
+const MAX_TOTAL: u64 = 4 << 30;
+/// Fichier de configuration des serveurs MCP : il lance des programmes, donc jamais restauré sans accord explicite.
+const MCP_FILE: &str = "mcp.json";
+const STAGING: &str = ".restauration-en-cours";
+
+fn open_archive(archive: &Path) -> Result<zip::ZipArchive<std::fs::File>, String> {
     let file = std::fs::File::open(archive).map_err(|e| format!("Ouverture impossible : {e}"))?;
     let mut zip = zip::ZipArchive::new(file).map_err(|_| "Ce fichier n'est pas une sauvegarde de Lama Desktop.".to_string())?;
     let mut manifest = String::new();
     zip.by_name(MANIFEST)
         .map_err(|_| "Ce fichier n'est pas une sauvegarde de Lama Desktop.".to_string())?
+        .take(1 << 20)
         .read_to_string(&mut manifest)
         .map_err(|e| e.to_string())?;
     if !manifest.contains("Lama Desktop") {
         return Err("Ce fichier n'est pas une sauvegarde de Lama Desktop.".into());
     }
-    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let current = dir.join(DB);
-    if current.exists() {
-        std::fs::rename(&current, dir.join("history-avant-restauration.db")).map_err(|e| e.to_string())?;
+    Ok(zip)
+}
+
+/// Noms des serveurs MCP (et leur commande) que la sauvegarde ajouterait ; vide si elle n'en contient pas.
+pub fn mcp_in_archive(archive: &Path) -> Result<Vec<String>, String> {
+    let mut zip = open_archive(archive)?;
+    let Ok(entry) = zip.by_name(MCP_FILE) else { return Ok(vec![]) };
+    let mut text = String::new();
+    entry.take(1 << 20).read_to_string(&mut text).map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+    let mut out = Vec::new();
+    if let Some(map) = v.get("mcpServers").and_then(|m| m.as_object()) {
+        for (name, cfg) in map {
+            let what = cfg.get("command").or_else(|| cfg.get("url")).and_then(|x| x.as_str()).unwrap_or("?");
+            out.push(format!("{name} → {what}"));
+        }
     }
-    let _ = std::fs::remove_file(dir.join("history.db-wal"));
-    let _ = std::fs::remove_file(dir.join("history.db-shm"));
-    let mut count = 0;
+    Ok(out)
+}
+
+/// Restaure une sauvegarde dans le dossier du profil. L'ancienne base est gardée sous `history-avant-restauration.db`.
+/// L'archive est d'abord entièrement extraite dans un dossier temporaire : si elle est invalide ou trop grosse,
+/// le profil n'est pas touché. `with_mcp` : restaurer aussi `mcp.json` (sinon la configuration MCP actuelle est conservée).
+pub fn restore(archive: &Path, dir: &Path, with_mcp: bool) -> Result<usize, String> {
+    let mut zip = open_archive(archive)?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let staging = dir.join(STAGING);
+    let _ = std::fs::remove_dir_all(&staging);
+    let extracted = extract(&mut zip, &staging, with_mcp);
+    let files = match extracted {
+        Ok(f) => f,
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(e);
+        }
+    };
+    let apply = || -> Result<usize, String> {
+        let current = dir.join(DB);
+        if current.exists() && files.iter().any(|f| f == Path::new(DB)) {
+            std::fs::rename(&current, dir.join("history-avant-restauration.db")).map_err(|e| e.to_string())?;
+        }
+        let _ = std::fs::remove_file(dir.join("history.db-wal"));
+        let _ = std::fs::remove_file(dir.join("history.db-shm"));
+        for rel in &files {
+            let target = dir.join(rel);
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            let _ = std::fs::remove_file(&target);
+            std::fs::rename(staging.join(rel), &target).map_err(|e| format!("Écriture de {} impossible : {e}", target.display()))?;
+        }
+        Ok(files.len())
+    };
+    let result = apply();
+    let _ = std::fs::remove_dir_all(&staging);
+    result
+}
+
+/// Extrait l'archive dans `staging` et renvoie les chemins relatifs écrits.
+fn extract(zip: &mut zip::ZipArchive<std::fs::File>, staging: &Path, with_mcp: bool) -> Result<Vec<PathBuf>, String> {
+    let mut files = Vec::new();
+    let mut total = 0u64;
     for i in 0..zip.len() {
-        let mut entry = zip.by_index(i).map_err(|e| e.to_string())?;
+        let entry = zip.by_index(i).map_err(|e| e.to_string())?;
         if entry.is_dir() || entry.name() == MANIFEST {
             continue;
         }
         // `enclosed_name` refuse les chemins qui sortiraient du dossier (« ../ », chemins absolus).
         let Some(rel) = entry.enclosed_name() else { continue };
-        let target = dir.join(rel);
+        if rel.starts_with(STAGING) || (!with_mcp && rel == Path::new(MCP_FILE)) {
+            continue;
+        }
+        let target = staging.join(&rel);
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        let mut bytes = Vec::new();
-        entry.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
-        std::fs::write(&target, bytes).map_err(|e| format!("Écriture de {} impossible : {e}", target.display()))?;
-        count += 1;
+        // La taille annoncée peut mentir : on compte les octets réellement décompressés.
+        let mut out = std::fs::File::create(&target).map_err(|e| format!("Écriture de {} impossible : {e}", target.display()))?;
+        let mut limited = entry.take(MAX_ENTRY.min(MAX_TOTAL - total) + 1);
+        let n = std::io::copy(&mut limited, &mut out).map_err(|e| e.to_string())?;
+        total += n;
+        if n > MAX_ENTRY || total > MAX_TOTAL {
+            return Err("Sauvegarde trop volumineuse une fois décompressée : restauration annulée.".into());
+        }
+        files.push(rel);
     }
-    Ok(count)
+    Ok(files)
 }
 
 /// Conversation en Markdown lisible.
@@ -173,7 +242,7 @@ mod tests {
         assert_eq!(backup(&src, &copy, &zip, "Samuel").unwrap(), 3);
 
         std::fs::write(dst.join("history.db"), "base actuelle").unwrap();
-        assert_eq!(restore(&zip, &dst).unwrap(), 3);
+        assert_eq!(restore(&zip, &dst, true).unwrap(), 3);
         assert_eq!(std::fs::read_to_string(dst.join("history.db")).unwrap(), "base cohérente");
         assert_eq!(std::fs::read_to_string(dst.join("history-avant-restauration.db")).unwrap(), "base actuelle");
         assert_eq!(std::fs::read_to_string(dst.join("skills/a/SKILL.md")).unwrap(), "# a");
@@ -185,8 +254,8 @@ mod tests {
         w.start_file("notes.txt", options()).unwrap();
         w.write_all(b"x").unwrap();
         w.finish().unwrap();
-        assert!(restore(&notes, &dst).unwrap_err().contains("pas une sauvegarde"));
-        assert!(restore(&work.join("absent.zip"), &dst).is_err());
+        assert!(restore(&notes, &dst, false).unwrap_err().contains("pas une sauvegarde"));
+        assert!(restore(&work.join("absent.zip"), &dst, false).is_err());
         for d in [src, dst, work] {
             let _ = std::fs::remove_dir_all(d);
         }
@@ -204,9 +273,39 @@ mod tests {
         w.start_file("ok.txt", options()).unwrap();
         w.write_all(b"y").unwrap();
         w.finish().unwrap();
-        assert_eq!(restore(&zip, &dst).unwrap(), 1);
+        assert_eq!(restore(&zip, &dst, false).unwrap(), 1);
         assert!(dst.join("ok.txt").exists());
         assert!(!dst.parent().unwrap().join("evil.txt").exists());
+        for d in [dst, work] {
+            let _ = std::fs::remove_dir_all(d);
+        }
+    }
+
+    #[test]
+    fn restore_skips_mcp_unless_allowed_and_never_touches_profile_on_bad_archive() {
+        let (dst, work) = (tmp(), tmp());
+        let zip = work.join("mcp.zip");
+        let mut w = zip::ZipWriter::new(std::fs::File::create(&zip).unwrap());
+        w.start_file(MANIFEST, options()).unwrap();
+        w.write_all(b"{\"app\":\"Lama Desktop\"}").unwrap();
+        w.start_file("mcp.json", options()).unwrap();
+        w.write_all(b"{\"mcpServers\":{\"x\":{\"command\":\"calc\"}}}").unwrap();
+        w.start_file("history.db", options()).unwrap();
+        w.write_all(b"nouvelle").unwrap();
+        w.finish().unwrap();
+        assert_eq!(mcp_in_archive(&zip).unwrap(), vec!["x → calc".to_string()]);
+        std::fs::write(dst.join("mcp.json"), "ancien").unwrap();
+        std::fs::write(dst.join("history.db"), "actuelle").unwrap();
+        assert_eq!(restore(&zip, &dst, false).unwrap(), 1);
+        assert_eq!(std::fs::read_to_string(dst.join("mcp.json")).unwrap(), "ancien");
+        assert_eq!(std::fs::read_to_string(dst.join("history.db")).unwrap(), "nouvelle");
+        assert!(!dst.join(STAGING).exists());
+        assert_eq!(restore(&zip, &dst, true).unwrap(), 2);
+        assert!(std::fs::read_to_string(dst.join("mcp.json")).unwrap().contains("calc"));
+        // Archive invalide : rien n'est modifié.
+        std::fs::write(work.join("x.zip"), "pas un zip").unwrap();
+        assert!(restore(&work.join("x.zip"), &dst, true).is_err());
+        assert_eq!(std::fs::read_to_string(dst.join("history.db")).unwrap(), "nouvelle");
         for d in [dst, work] {
             let _ = std::fs::remove_dir_all(d);
         }
