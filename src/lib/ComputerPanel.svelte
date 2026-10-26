@@ -65,11 +65,11 @@
   }
 
   const ABILITIES = [
-    ["Heure et infos du PC", "date, fuseau, disques, batterie, processus, applications installées"],
-    ["Ouvrir", "un site dans ton navigateur, un fichier ou dossier, une application"],
+    ["Heure et infos du PC", "date, disques, batterie, processus, applications installées"],
+    ["Ouvrir", "un site, un fichier, un dossier ou une application"],
     ["Presse-papiers", "lire ou copier du texte"],
     ["Réglages", "volume, sourdine, thème sombre, luminosité, verrouillage"],
-    ["Voir l'écran", "capture d'écran (le modèle doit avoir la vision)"],
+    ["Voir l'écran", "faire une capture d'écran (le modèle doit savoir lire les images)"],
     ["Souris et clavier", "cliquer, saisir du texte, raccourcis"],
   ];
 </script>
@@ -77,8 +77,8 @@
 <section>
   <label class="check">
     <input type="checkbox" bind:checked={enabled} onchange={save} disabled={!ready} />
-    <span><strong>Autoriser Lama à agir sur ce PC</strong><br />
-      <span class="muted">Chaque action demande ton accord dans une fenêtre (Autoriser ou Refuser), sauf si tu choisis « Ignorer les permissions » dans le menu Mode. Le bouton Stop interrompt tout.</span></span>
+    <span><strong>Laisser Lama agir sur ce PC</strong><br />
+      <span class="muted">Chaque action te demande ton accord (Autoriser ou Refuser), sauf si tu choisis « Ignorer les permissions » dans le menu Mode. Le bouton Stop arrête tout.</span></span>
   </label>
   <ul class="abilities" class:off={!enabled}>
     {#each ABILITIES as [name, desc]}
@@ -89,15 +89,13 @@
 
 <section>
   <h3>Dossiers autorisés</h3>
-  <p class="muted">
-    En plus du dossier de travail du mode Code, le modèle peut lire, chercher et (avec ton accord à chaque fois) modifier des fichiers dans ces dossiers, y compris en mode Chat. Rien en dehors.
-  </p>
+  <p class="muted">En plus du dossier de travail du mode Code, le modèle peut lire, chercher et modifier des fichiers dans ces dossiers (avec ton accord à chaque fois pour modifier), y compris en mode Chat. Rien en dehors.</p>
   <ul>
     {#each dirs as d (d)}
       <li><span class="grow path" title={d}>{d}</span>
         <button class="del" aria-label="Retirer ce dossier" onclick={() => remove(d)}><Icon name="close" size={14} /></button></li>
     {:else}
-      <li class="muted">Aucun dossier autorisé.</li>
+      <li class="muted">Aucun dossier pour l'instant.</li>
     {/each}
   </ul>
   <div class="row"><button onclick={add}>Ajouter un dossier…</button></div>
@@ -106,7 +104,7 @@
 
 <section>
   <h3>Rappels programmés</h3>
-  <p class="muted">Demande par exemple « rappelle-moi dans 20 minutes de sortir le gratin ». Un rappel ne sonne que si Lama Desktop est ouvert (sinon à la prochaine ouverture).</p>
+  <p class="muted">Demande par exemple « rappelle-moi dans 20 minutes de sortir le gratin ». Le rappel ne sonne que si Lama Desktop est ouvert, sinon il sonne à la prochaine ouverture.</p>
   <ul>
     {#each reminders as r (r.id)}
       <li><span class="grow"><strong>{r.title}</strong> <span class="muted">— {r.body} · {at(r)}</span></span>
@@ -119,7 +117,7 @@
 
 <section>
   <h3>Journal des actions</h3>
-  <p class="muted">Ce que l'agent a fait sur ton PC (commandes, fichiers, souris, presse-papiers…). Le texte saisi ou copié n'est jamais enregistré, seulement sa taille.</p>
+  <p class="muted">Ce que l'agent a fait sur ton PC (commandes, fichiers, souris, presse-papiers…). Le texte tapé ou copié n'est jamais enregistré, seulement sa taille.</p>
   <ul class="journal">
     {#each journal as e}
       <li><span class="when">{when(e.t)}</span><strong>{e.tool}</strong><span class="grow sum" title={e.summary}>{e.summary}</span><em class={e.outcome}>{OUTCOME[e.outcome] ?? e.outcome}</em></li>

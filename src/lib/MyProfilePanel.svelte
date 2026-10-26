@@ -33,10 +33,8 @@
 </script>
 
 <div class="panel">
-  <p class="muted">
-    Ce que Lama sait de toi. Ces réponses sont enregistrées dans la mémoire de ce profil et transmises au modèle dans chaque conversation :
-    modifie-les quand ta situation change. Rien ne quitte ce PC, hors des messages envoyés à Ollama Cloud.
-  </p>
+  <p class="muted">Ces réponses sont gardées dans la mémoire de ce profil et envoyées au modèle dans chaque conversation. Change-les quand ta situation évolue.
+  Rien ne quitte ce PC, à part les messages envoyés à Ollama Cloud.</p>
   <p class="muted">
     Pour remplir des formulaires (adresse, téléphone, mots de passe), utilise plutôt le <b>Coffre</b> (Réglages → Coffre) : ces informations y sont chiffrées et jamais envoyées au modèle.
   </p>

@@ -36,25 +36,25 @@
   /** Ce que le PC permet, en une phrase. */
   const summary = $derived.by(() => {
     if (!hw) return "";
-    if (dedicated && dedicated.vram_mb >= 6000) return `Ta carte graphique (${gb(dedicated.vram_mb)}) permet de faire tourner des modèles locaux de taille moyenne à bonne vitesse.`;
-    if (dedicated && dedicated.vram_mb >= 3000) return `Ta carte graphique (${gb(dedicated.vram_mb)}) convient à de petits modèles locaux ; les plus gros seront plus lents.`;
-    if (hw.ram_mb >= 12000) return "Pas de carte graphique dédiée utilisable : les modèles locaux tourneront sur le processeur, correctement pour les petits modèles mais lentement pour les autres.";
-    return "Ce PC est juste pour des modèles locaux : Ollama Cloud sera bien plus confortable.";
+    if (dedicated && dedicated.vram_mb >= 6000) return `Ta carte graphique (${gb(dedicated.vram_mb)}) fait tourner des modèles de taille moyenne à bonne vitesse.`;
+    if (dedicated && dedicated.vram_mb >= 3000) return `Ta carte graphique (${gb(dedicated.vram_mb)}) suffit pour de petits modèles. Les plus gros seront plus lents.`;
+    if (hw.ram_mb >= 12000) return "Pas de carte graphique dédiée : les modèles tourneront sur le processeur. Ça va pour les petits, c'est lent pour les autres.";
+    return "Ce PC est un peu juste pour les modèles locaux. Ollama Cloud sera bien plus confortable.";
   });
 </script>
 
 <section>
-  <h3>Ce PC</h3>
-  <p class="muted">Ce que ton ordinateur peut faire tourner. Sert à proposer des modèles locaux adaptés ; rien n'est envoyé.</p>
+  <h3>Ton PC</h3>
+  <p class="muted">Ce que ton ordinateur a dans le ventre. Lama s'en sert pour te proposer des modèles qui tiennent la route, et rien de tout ça ne quitte ton PC.</p>
 
   {#if hw}
     <dl>
-      <dt>Processeur</dt><dd>{hw.cpu} · {hw.cores} threads{hw.avx2 ? "" : " · sans AVX2 (lent)"}</dd>
+      <dt>Processeur</dt><dd>{hw.cpu} · {hw.cores} threads{hw.avx2 ? "" : " · pas d'AVX2, donc lent"}</dd>
       <dt>Mémoire</dt><dd>{gb(hw.ram_mb)} <span class="muted">({gb(hw.ram_free_mb)} libres)</span></dd>
       <dt>{hw.gpus.length > 1 ? "Cartes graphiques" : "Carte graphique"}</dt>
       <dd>
         {#each hw.gpus as g (g.name)}
-          <div>{g.name} <span class="muted">· {g.integrated ? "intégrée, utilise la mémoire du PC" : g.vram_mb ? `${gb(g.vram_mb)} dédiés` : "mémoire inconnue"}</span></div>
+          <div>{g.name} <span class="muted">· {g.integrated ? "intégrée, elle utilise la mémoire du PC" : g.vram_mb ? `${gb(g.vram_mb)} dédiés` : "mémoire inconnue"}</span></div>
         {:else}
           <span class="muted">Aucune détectée</span>
         {/each}

@@ -34,10 +34,8 @@
     <input type="checkbox" bind:checked={info.autostart} onchange={save} />
     <span>Lancer Lama Desktop au démarrage de Windows<br /><span class="muted">Il démarre discrètement dans la zone de notification.</span></span>
   </label>
-  <p class="muted">
-    Arrêt d'urgence : <kbd>{info.shortcut}</kbd> (ou clic droit sur l'icône de la zone de notification) coupe aussitôt tous les agents, les commandes en arrière-plan et les demandes en attente, même si la fenêtre n'est pas au premier plan.
-    {#if !info.shortcut_ok}<span class="bad"> Ce raccourci est déjà pris par une autre application : utilise l'icône de la zone de notification.</span>{/if}
-  </p>
+  <p class="muted">Arrêt d'urgence : <kbd>{info.shortcut}</kbd> (ou clic droit sur l'icône près de l'horloge) coupe tout de suite les agents, les commandes en arrière-plan et les demandes en attente, même si la fenêtre n'est pas devant.
+    {#if !info.shortcut_ok}<span class="bad"> Ce raccourci est déjà pris par une autre appli : utilise l'icône près de l'horloge.</span>{/if}</p>
   {#if error}<p class="bad">{error}</p>{/if}
 </section>
 

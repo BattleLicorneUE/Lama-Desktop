@@ -13,11 +13,9 @@
 </script>
 
 <section>
-  <h3>Mises à jour</h3>
-  <p class="muted">
-    Lama Desktop vérifie au lancement s'il existe une nouvelle version publiée sur GitHub. Chaque mise à jour est signée : l'application refuse d'installer un fichier qui ne vient pas de son auteur.
-    Tes conversations, ton coffre et tes réglages ne sont pas touchés.
-  </p>
+  
+  <p class="muted">Lama Desktop regarde au démarrage s'il existe une version plus récente sur GitHub. Chaque mise à jour est signée : l'application refuse un fichier qui ne vient pas de son auteur.
+    Tes conversations, ton coffre et tes réglages ne sont pas touchés.</p>
   <p class="ver">Version installée : <b>{updater.current || "…"}</b></p>
 
   {#if updater.status === "checking"}
@@ -47,7 +45,6 @@
 
 <style>
   section { display: flex; flex-direction: column; gap: 10px; }
-  h3 { margin: 0 0 6px; font-size: 17px; font-weight: 600; }
   .muted { color: var(--muted); font-size: 13px; margin: 0; line-height: 1.45; }
   .ver { margin: 0; font-size: 14px; }
   .ok { margin: 0; font-size: 13.5px; color: var(--add); }

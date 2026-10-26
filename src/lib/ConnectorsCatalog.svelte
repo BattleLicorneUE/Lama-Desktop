@@ -112,11 +112,8 @@
 </script>
 
 <section>
-  <h3>Mes serveurs MCP</h3>
-  <p class="muted">
-    Ajoute n'importe quel serveur MCP : une commande lancée sur ce PC, l'adresse d'un serveur HTTP, ou une configuration copiée depuis une documentation
-    (format Claude Desktop, Claude Code ou Cursor). Les clés et jetons sont rangés dans le coffre Windows.
-  </p>
+  <h3>Mes connecteurs</h3>
+  <p class="muted">Ajoute n'importe quel serveur MCP : une commande lancée sur ce PC, l'adresse d'un serveur HTTP, ou une configuration copiée depuis une documentation (format Claude Desktop, Claude Code ou Cursor). Les clés et jetons vont dans le coffre Windows.</p>
   {#if customMsg}<p class="note" role="status">{customMsg}</p>{/if}
   <ul>
     {#each mine as id (id)}
@@ -180,9 +177,9 @@
 
 <section>
   <h3>Catalogue de connecteurs</h3>
-  <p class="muted">
-    Ajoute un service en quelques champs : les jetons sont gardés dans le coffre Windows, jamais dans le fichier de configuration. Après l'ajout, l'application démarre le connecteur et affiche le nombre d'outils reçus (ou l'erreur). Les connecteurs sont des programmes tiers lancés sur ton PC avec <code>npx</code> ou <code>uvx</code> : Node.js ou uv doivent être installés, et je n'ai pas pu tous les tester avec ton compte.
-  </p>
+  <p class="muted">Choisis un service, remplis quelques champs et c'est fait. Les jetons vont dans le coffre Windows, jamais dans le fichier de configuration.
+    Après l'ajout, Lama démarre le connecteur et affiche le nombre d'outils reçus, ou l'erreur. Ce sont des programmes tiers lancés sur ton PC avec <code>npx</code> ou <code>uvx</code> : il faut avoir Node.js ou uv installé.
+    Je n'ai pas pu tous les essayer avec un vrai compte.</p>
   {#each categories as cat}
     <h4>{cat}</h4>
     <ul>

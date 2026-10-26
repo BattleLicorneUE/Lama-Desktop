@@ -242,11 +242,8 @@
 </script>
 
 <section>
-  <h3>Coffre</h3>
-  <p class="muted">
-    Tes mots de passe et tes informations rapides (adresse, téléphone…), chiffrés sur ce PC avec ton mot de passe maître (Argon2id + XChaCha20-Poly1305).
-    Rien ne quitte ton ordinateur, et le modèle d'IA ne voit jamais un secret : la saisie passe directement par le clavier.
-  </p>
+  
+  <p class="muted">Tout est chiffré avec ton mot de passe maître. Rien ne quitte ton ordinateur, et le modèle ne voit jamais un secret : le texte est tapé directement au clavier.</p>
 </section>
 
 {#if msg}<p class="msg" class:bad role="status">{msg}</p>{/if}
@@ -256,7 +253,7 @@
 {:else if !status.exists}
   <section class="card">
     <h4>Créer ton coffre</h4>
-    <p class="muted">Choisis un mot de passe maître solide : une phrase de plusieurs mots est idéale. <b>Il n'existe aucun moyen de le récupérer</b> : si tu l'oublies, le contenu est perdu.</p>
+    <p class="muted">Choisis un mot de passe maître solide, une phrase de plusieurs mots par exemple. Il n'y a aucun moyen de le retrouver : si tu l'oublies, le contenu est perdu.</p>
     <form onsubmit={(e) => { e.preventDefault(); create(); }}>
       <label><span>Mot de passe maître</span><input type="password" bind:value={master} autocomplete="new-password" spellcheck="false" /></label>
       {#if master}<div class="meter" data-level={mStrength.level} title="{mStrength.bits} bits"><span style:width="{(mStrength.level + 1) * 20}%"></span><small>{mStrength.label}</small></div>{/if}
@@ -347,7 +344,7 @@
       </ul>
     {/if}
   {:else if tab === "infos"}
-    <p class="muted">Des informations que tu retapes souvent. « Remplir » réduit Lama puis les tape dans le champ choisi ; tu peux en cocher plusieurs pour remplir un formulaire d'un coup (une tabulation les sépare, dans l'ordre de la liste).</p>
+    <p class="muted">Des infos que tu retapes souvent. « Remplir » réduit Lama et les tape dans le champ choisi. Tu peux en cocher plusieurs pour remplir un formulaire d'un coup (elles sont séparées par une tabulation, dans l'ordre de la liste).</p>
     {#if infoEditor}
       <form class="card" onsubmit={(e) => { e.preventDefault(); saveInfo(); }}>
         <label><span>Nom de la rubrique</span><input bind:value={infoEditor.label} placeholder="Ex. Téléphone" autocomplete="off" /></label>
@@ -394,21 +391,17 @@
         <input type="checkbox" checked={status.agent_access} onchange={(e) => setAgent(e.currentTarget.checked)} />
         Autoriser l'assistant à utiliser le coffre
       </label>
-      <p class="muted">
-        Désactivé par défaut. Activé, l'assistant peut lister les noms de tes entrées (jamais un mot de passe) et <b>demander</b> à remplir un formulaire.
-        Chaque saisie t'affiche d'abord ce qui sera tapé et attend ton accord, même en mode « Ignorer les permissions ». L'assistant ne voit jamais les valeurs.
-        Le coffre doit être ouvert pour qu'il y ait accès. Il peut aussi se connecter lui-même à un site dans le navigateur de Lama (voir plus bas), à condition que la page soit bien celle de l'entrée.
-      </p>
+      <p class="muted">Désactivé par défaut. Si tu l'actives, l'assistant peut voir les noms de tes entrées (jamais un mot de passe) et <b>demander</b> à remplir un formulaire.
+        Avant chaque saisie, tu vois ce qui sera tapé et tu dois dire oui, même en mode « Ignorer les permissions ». Le coffre doit être ouvert.
+        L'assistant peut aussi se connecter à un site dans le navigateur de Lama (voir plus bas), à condition que la page soit bien celle de l'entrée.</p>
     </section>
 
     <section class="card">
       <h4>Navigateur de Lama</h4>
-      <p class="muted">
-        Une fenêtre {br.name || "Edge, Chrome ou Brave"} à part, avec ses propres sessions : elle ne voit ni tes onglets ni tes mots de passe habituels.
-        Connecte-toi une fois à la main (double authentification et CAPTCHA compris) et la session reste ouverte : l'assistant n'a alors souvent plus besoin du mot de passe.
-        Pour une connexion automatique, il remplit identifiant et mot de passe sans que le modèle les voie, <b>uniquement si l'adresse de la page est celle de l'entrée du coffre</b> (https, même site) ;
-        sur un faux site, rien n'est saisi.
-      </p>
+      <p class="muted">C'est une fenêtre {br.name || "Edge, Chrome ou Brave"} à part, avec ses propres sessions : elle ne voit ni tes onglets ni tes mots de passe habituels.
+        Connecte-toi une fois à la main (double authentification et captcha compris) : la session reste ouverte et l'assistant n'a souvent plus besoin du mot de passe.
+        Pour une connexion automatique, il remplit l'identifiant et le mot de passe sans que le modèle les voie, <b>seulement si l'adresse de la page est bien celle de l'entrée</b> (https, même site).
+        Sur un faux site, rien n'est tapé.</p>
       {#if !br.available}
         <p class="msg bad">Aucun navigateur compatible (Edge, Chrome ou Brave) n'est installé sur ce PC.</p>
       {:else}
@@ -455,7 +448,6 @@
 
 <style>
   section { display: flex; flex-direction: column; gap: 10px; }
-  h3 { margin: 0 0 6px; font-size: 17px; font-weight: 600; }
   h4 { margin: 0; font-size: 15px; font-weight: 600; }
   .muted { color: var(--muted); font-size: 13px; margin: 0; line-height: 1.45; }
   .msg { margin: 0; font-size: 13.5px; color: var(--add); word-break: break-word; }

@@ -87,11 +87,9 @@
 </script>
 
 <section>
-  <h3>Sauvegarde</h3>
-  <p class="muted">
-    Une archive .zip du profil ouvert : conversations, projets et leurs documents, mémoire, artéfacts, tâches planifiées, réglages, skills, agents et configuration des connecteurs.
-    Les clés et jetons restent dans le coffre Windows : ils ne sont pas dans la sauvegarde, il faudra les ressaisir sur un autre PC.
-  </p>
+  <h3>Sauvegarder</h3>
+  <p class="muted">Un fichier .zip avec tout le profil ouvert : conversations, projets et leurs documents, mémoire, artefacts, tâches planifiées, réglages, skills, agents et connecteurs.
+    Les clés et jetons restent dans le coffre Windows, ils ne sont pas dans la sauvegarde. Sur un autre PC, il faudra les ressaisir.</p>
   <div class="row">
     <button onclick={backup} disabled={busy}>Créer une sauvegarde…</button>
     <button onclick={restore} disabled={busy}>Restaurer une sauvegarde…</button>
@@ -100,7 +98,7 @@
 
 <section>
   <h3>Exporter mes conversations</h3>
-  <p class="muted">Toutes les conversations (chat et code) en fichiers Markdown lisibles partout, rangées dans un dossier par projet. L'export d'une seule conversation est dans son menu, dans la liste.</p>
+  <p class="muted">Toutes tes conversations (chat et code) en fichiers Markdown, lisibles partout, avec un dossier par projet. Pour exporter une seule conversation, utilise son menu dans la liste.</p>
   <div class="row"><button onclick={exportChats} disabled={busy}>Exporter tout en Markdown…</button></div>
 </section>
 
@@ -108,11 +106,9 @@
 
 <section class="danger">
   <h3>Tout effacer</h3>
-  <p class="muted">
-    Supprime définitivement toutes les données de Lama Desktop sur ce PC, <b>tous profils confondus</b> : conversations, projets, mémoire, tâches, réglages, skills, agents, connecteurs,
-    clés enregistrées dans le coffre Windows et lancement avec Windows. L'application redémarre comme au premier jour.
-    Les documents que l'agent a créés dans <code>Documents\Lama Desktop</code> et tes propres dossiers de travail ne sont pas touchés.
-  </p>
+  <p class="muted">Supprime pour de bon toutes les données de Lama Desktop sur ce PC, <b>tous profils confondus</b> : conversations, projets, mémoire, tâches, réglages, skills, agents, connecteurs,
+  clés du coffre Windows et lancement avec Windows. L'application repart de zéro.
+  Les documents créés par l'agent dans <code>Documents\Lama Desktop</code> et tes propres dossiers de travail ne sont pas touchés.</p>
   <label class="field">
     <span>Pour confirmer, tape <code>EFFACER</code></span>
     <input bind:value={confirmText} autocomplete="off" spellcheck="false" placeholder="EFFACER" />

@@ -85,11 +85,9 @@
 </script>
 
 <section>
-  <h3>Modèles locaux</h3>
-  <p class="muted">
-    Des modèles qui tournent sur ton ordinateur, sans internet ni clé API, avec le moteur llama.cpp téléchargé par l'application (environ 40 Mo, une seule fois).
-    Un seul modèle est chargé à la fois ; il est déchargé de la mémoire après 15 minutes sans utilisation. Les tailles et vitesses sont approximatives.
-  </p>
+  <h3>Modèles</h3>
+  <p class="muted">Pas besoin d'internet ni de clé. Lama télécharge d'abord le moteur (environ 40 Mo, une seule fois), puis le modèle que tu choisis.
+    Un seul modèle est chargé à la fois, et il est libéré de la mémoire après 15 minutes sans servir. Les tailles et les vitesses sont des ordres de grandeur.</p>
 
   {#if chat.localError}<p class="bad" role="alert">{chat.localError}</p>{/if}
   {#if error}<p class="bad" role="alert">{error}</p>{/if}
@@ -102,7 +100,7 @@
         <button onclick={() => chat.cancelLocal(chat.localProgress!.id)}>Annuler</button>
       </div>
       <div class="bar"><i style:width="{pct}%"></i></div>
-      <p class="muted">Tu peux fermer cette page : le téléchargement continue. S'il est interrompu, il reprend là où il s'était arrêté.</p>
+      <p class="muted">Tu peux fermer cette page, le téléchargement continue. S'il s'arrête, il reprendra où il en était.</p>
     </div>
   {/if}
 
@@ -118,7 +116,7 @@
           <span class="size">{bytes(m.size_bytes)}</span>
         </header>
         <label class="ctx">
-          <span>Contexte (mémoire de la conversation)</span>
+          <span>Taille de la conversation (contexte)</span>
           <select value={m.ctx_setting} onchange={(e) => pickCtx(m.id, e.currentTarget.value)} disabled={chat.busy}>
             <option value={0}>Automatique · {tok(m.auto_ctx)} jetons</option>
             {#each m.options as o (o.ctx)}
@@ -127,8 +125,9 @@
           </select>
         </label>
         <p class="why">
-          Utilisé : <b>{tok(m.ctx)} jetons</b> (≈ {Math.round(m.ctx * 0.75).toLocaleString("fr-FR")} mots). Maximum du modèle : {tok(m.max_ctx)}. Plus le contexte est grand, plus il faut de mémoire et plus la lecture d'un long
-          texte est lente ; si la carte graphique ne suffit plus, le modèle ralentit. Pour coder, 32 k est un bon minimum. Le changement s'applique au prochain message.
+          En ce moment : <b>{tok(m.ctx)} jetons</b>, soit environ {Math.round(m.ctx * 0.75).toLocaleString("fr-FR")} mots. Le modèle va jusqu'à {tok(m.max_ctx)}.
+          Plus c'est grand, plus il faut de mémoire et plus la lecture d'un long texte est lente. Si la carte graphique ne suffit plus, le modèle ralentit.
+          Pour coder, vise 32 k au minimum. Le changement compte dès le prochain message.
         </p>
         <div class="row">
           <button class="go" onclick={() => use(m.id)} disabled={chat.busy || chat.model === LOCAL_PREFIX + m.id}>Utiliser</button>
@@ -161,7 +160,7 @@
       </div>
     </article>
   {:else}
-    <p class="muted">{items.length ? "Tous les modèles adaptés à ce PC sont déjà installés." : "Analyse en cours…"}</p>
+    <p class="muted">{items.length ? "Tous les modèles adaptés à ton PC sont déjà installés." : "Analyse en cours…"}</p>
   {/each}
 
   {#if heavy.length}

@@ -45,12 +45,9 @@
 </script>
 
 <div class="panel">
-  <p class="muted">
-    Un agent est un rôle : une consigne, des outils autorisés et, au choix, son propre modèle. Tu n'as rien à activer : l'agent principal décide
-    <strong>seul</strong>, selon la tâche, s'il en confie une partie à l'un d'eux (travail en parallèle, avec son propre contexte, résumé en retour)
-    ou s'il la fait lui-même. La <em>description</em> de chaque agent lui indique quand s'en servir.
-    Format identique aux agents de Claude Code (fichiers <code>.md</code>) ; ceux d'un projet vont dans <code>.agents/</code>.
-  </p>
+  <p class="muted">Un agent, c'est un rôle : des consignes, une liste d'outils autorisés et, si tu veux, son propre modèle. Tu n'as rien à activer.
+    Selon la tâche, l'agent principal décide <strong>seul</strong> de confier une partie du travail à l'un d'eux (ils travaillent en parallèle, chacun avec sa propre mémoire, et rendent un résumé) ou de la faire lui-même.
+    La <em>description</em> de chaque agent lui dit quand s'en servir. Même format que les agents de Claude Code (fichiers <code>.md</code>), ceux d'un projet vont dans <code>.agents/</code>.</p>
   {#if msg}<p class="msg">{msg}</p>{/if}
 
   <section>

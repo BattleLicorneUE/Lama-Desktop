@@ -27,8 +27,9 @@
 </script>
 
 <section>
-  <h3>Utilisation</h3>
-  <p class="muted">Jetons consommés avec ce profil, comptés par l'app à chaque réponse (les jetons envoyés au modèle, puis ceux qu'il génère). Ollama Cloud applique ses propres limites d'usage à ton compte : l'état exact de tes quotas est sur <b>ollama.com</b>.</p>
+  
+  <p class="muted">Les jetons sont les petits morceaux de texte que le modèle lit et écrit. Ici, ceux de ce profil, comptés à chaque réponse : d'abord ceux que tu envoies, puis ceux que le modèle génère.
+  Ollama Cloud a ses propres limites sur ton compte, tu les vois sur <b>ollama.com</b>.</p>
   <div class="cards">
     <div><small>Aujourd'hui</small><b>{formatTokens(chat.usage.dayIn + chat.usage.dayOut)}</b><span>{formatTokens(chat.usage.dayIn)} envoyés · {formatTokens(chat.usage.dayOut)} générés</span></div>
     <div><small>14 derniers jours</small><b>{formatTokens(last14)}</b><span>{formatTokens(days.reduce((n, d) => n + d.i, 0))} envoyés · {formatTokens(days.reduce((n, d) => n + d.o, 0))} générés</span></div>
@@ -61,9 +62,9 @@
         </li>
       {/each}
     </ul>
-    <p class="muted">Le détail par modèle compte à partir de cette version.</p>
+    <p class="muted">Le détail par modèle ne compte qu'à partir de cette version.</p>
   {:else}
-    <p class="muted">Rien à afficher pour l'instant : les modèles apparaissent après leurs premières réponses.</p>
+    <p class="muted">Rien pour l'instant. Les modèles apparaissent après leurs premières réponses.</p>
   {/if}
 </section>
 

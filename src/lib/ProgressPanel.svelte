@@ -35,8 +35,8 @@
 </script>
 
 <section>
-  <h3>Progression</h3>
-  <p class="muted">Gagne des points en utilisant Lama, monte de niveau et débloque des badges. Tout reste sur ce PC, pour ce profil.</p>
+  
+  <p class="muted">Tu gagnes des points en utilisant Lama, tu montes de niveau et tu débloques des badges. Tout reste sur ce PC, pour ce profil.</p>
   <label class="check">
     <input type="checkbox" checked={chat.gamify} onchange={(e) => chat.setGamify(e.currentTarget.checked)} />
     Afficher la progression et les félicitations
@@ -86,7 +86,7 @@
 
   <section>
     <h3>Comment gagner des points</h3>
-    <p class="muted">Envoyer un message (5), recevoir une réponse (3), faire modifier des fichiers (15), créer un projet (20) ou une tâche planifiée (20), ajouter un souvenir (10), garder un artéfact (10), essayer un nouveau modèle (15), faire une sauvegarde (20). Un bonus apparaît à chaque jour de série.</p>
+    <p class="muted">Envoyer un message (5), recevoir une réponse (3), faire modifier des fichiers (15), créer un projet (20) ou une tâche planifiée (20), ajouter un souvenir (10), garder un artefact (10), essayer un nouveau modèle (15), faire une sauvegarde (20). Chaque jour de série ajoute un bonus.</p>
     <div class="row"><button onclick={reset}>Réinitialiser la progression</button></div>
   </section>
 {/if}

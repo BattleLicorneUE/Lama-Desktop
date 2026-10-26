@@ -134,9 +134,9 @@
 </script>
 
 <div class="panel">
-  <p class="muted">
-    Un skill est un dossier avec un fichier <code>SKILL.md</code> (format de Claude). Le modèle voit un index compact de tous les skills activés (descriptions raccourcies selon la place disponible, les plus pertinents pour ta demande détaillés), cherche les autres avec <code>search_skills</code>, puis charge celui qu'il choisit ; <code>/nom</code> force un skill. Le nombre de skills n'est pas limité. Un skill peut contenir des scripts que l'agent exécute <strong>avec tes autorisations</strong> : n'installe que des sources de confiance.
-  </p>
+  <p class="muted">Un skill est un dossier avec un fichier <code>SKILL.md</code> (le même format que chez Claude). Lama garde la liste de tes skills activés, cherche le bon pour ta demande et le charge.
+    Tape <code>/nom</code> pour en forcer un. Il n'y a pas de limite au nombre de skills.
+    Un skill peut contenir des scripts que l'agent lance <strong>avec tes autorisations</strong> : n'installe que des sources en lesquelles tu as confiance.</p>
   {#if msg}<p class="msg">{msg}</p>{/if}
 
   <!-- ===== Installés ===== -->
