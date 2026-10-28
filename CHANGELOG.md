@@ -4,6 +4,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), ver
 
 ## [Non publié]
 
+### Modifié
+- **Modèles locaux, page refaite** : deux onglets (Installés, À installer), filtres par usage, espace disque utilisé et libre, réglage de la taille de conversation replié par défaut.
+- **Plusieurs installations à la suite** : un modèle peut être mis en file pendant qu'un autre se télécharge ; vitesse et temps restant affichés, file modifiable, annulation d'un seul modèle ou de tout.
+- **Suppression plus claire** : la confirmation indique l'espace libéré, le résultat s'affiche, et Lama bascule sur un autre modèle si on supprime celui qui était choisi.
+- **Téléchargements interrompus** : leur taille est visible et un bouton « Nettoyer » les supprime.
+
+### Corrigé
+- Les modèles dont le nom contient un point (`qwen3-1.7b`, `llama3.2-3b`, `qwen2.5-coder-7b`) ne pouvaient pas être supprimés.
+- Supprimer un modèle en cours d'installation est refusé au lieu de laisser un dossier à moitié supprimé ; le réglage de contexte d'un modèle supprimé est oublié.
+
 ## [0.3.1] - 2026-10-28
 
 ### Ajouté

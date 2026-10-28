@@ -157,11 +157,16 @@ struct LocalStatus {
     running: Option<String>,
     installing: Option<String>,
     engine_bytes: u64,
+    /// Espace pris par les téléchargements interrompus.
+    partial_bytes: u64,
+    /// Espace libre sur le disque des données de l'application, en Mo.
+    free_mb: u64,
 }
 
 #[tauri::command]
 async fn local_status(app: AppHandle) -> Result<LocalStatus, String> {
-    Ok(LocalStatus { running: localai::running_model().await, installing: localai::installing(), engine_bytes: localai::engine_bytes(&app_root(&app)?) })
+    let root = app_root(&app)?;
+    Ok(LocalStatus { running: localai::running_model().await, installing: localai::installing(), engine_bytes: localai::engine_bytes(&root), partial_bytes: localai::partial_bytes(&root), free_mb: hardware::free_mb(&root) })
 }
 
 /// Lance l'installation d'un modèle du catalogue : la progression arrive par `local:progress`, la fin par `local:done` ou `local:error`.
@@ -201,8 +206,14 @@ fn local_cancel(id: String) {
 }
 
 #[tauri::command]
-async fn local_remove(app: AppHandle, id: String) -> Result<(), String> {
+async fn local_remove(app: AppHandle, id: String) -> Result<u64, String> {
     localai::remove(&app_root(&app)?, &id).await
+}
+
+/// Supprime les téléchargements interrompus ; renvoie l'espace libéré en octets.
+#[tauri::command]
+fn local_clean_partials(app: AppHandle) -> Result<u64, String> {
+    localai::clean_partials(&app_root(&app)?)
 }
 
 /// Catalogue des modèles d'Ollama Cloud. La liste est publique : elle ne prouve pas que la clé est valide.
@@ -2009,7 +2020,7 @@ pub fn run() {
             project_docs, project_doc_add, project_doc_delete,
             chat_once, mcp_add, mcp_add_custom, mcp_import, mcp_remove,
             secret_get, secret_set, save_text, git_status, git_diff, git_commit,
-            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, analytics_get, analytics_set, analytics_ui, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, net_online, local_models_assess, local_installed, local_set_ctx, local_status, local_install, local_cancel, local_remove, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
+            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, analytics_get, analytics_set, analytics_ui, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, net_online, local_models_assess, local_installed, local_set_ctx, local_status, local_install, local_cancel, local_remove, local_clean_partials, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
             profiles_list, profile_create, profile_update, profile_set_pin, profile_delete, profile_select,
             agents_list, agent_create, agents_import_claude, agents_open_dir,
             model_show, context_report, fs_create, fs_rename, fs_delete,

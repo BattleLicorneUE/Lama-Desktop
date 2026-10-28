@@ -12,6 +12,7 @@ export function installMock() {
   const callbacks = new Map<number, (e: unknown) => void>();
   let localInstalled: { id: string; name: string; size_bytes: number; tools: boolean; vision: boolean; license: string; ctx: number; ctx_setting: number; auto_ctx: number; max_ctx: number; options: { ctx: number; mem_mb: number }[] }[] = [];
   let localCancelled = false;
+  let localPartial = 734003200;
   const listeners = new Map<string, number[]>();
   let nextId = 1;
 
@@ -380,27 +381,35 @@ export function installMock() {
       case "local_installed":
         return localInstalled;
       case "local_status":
-        return { running: null, installing: null, engine_bytes: localInstalled.length ? 38000000 : 0 };
+        return { running: null, installing: null, engine_bytes: localInstalled.length ? 38000000 : 0, partial_bytes: localPartial, free_mb: 69919 - localInstalled.length * 5000 };
       case "local_set_ctx":
         localInstalled = localInstalled.map((m) => (m.id === args.id ? { ...m, ctx_setting: Number(args.ctx), ctx: Number(args.ctx) || m.auto_ctx } : m));
         return null;
       case "local_cancel":
         localCancelled = true;
         return null;
-      case "local_remove":
+      case "local_remove": {
+        const gone = localInstalled.find((m) => m.id === args.id);
         localInstalled = localInstalled.filter((m) => m.id !== args.id);
-        return null;
+        return gone?.size_bytes ?? 0;
+      }
+      case "local_clean_partials": {
+        const freed = localPartial;
+        localPartial = 0;
+        return freed;
+      }
       case "local_install": {
         const id = String(args.id);
         localCancelled = false;
         void (async () => {
-          const total = 5027783488;
+          const total = id === "qwen3-14b" ? 9000000000 : 5027783488;
+          const label = id === "qwen3-14b" ? "Qwen3 14B" : "Qwen3 8B";
           for (let step = 1; step <= 10 && !localCancelled; step++) {
-            emit("local:progress", { id, phase: step < 2 ? "moteur" : "modèle", file: "Qwen3-8B-Q4_K_M.gguf", done: (total / 10) * step, total });
+            emit("local:progress", { id, phase: step < 2 ? "moteur" : "modèle", file: id + ".gguf", done: (total / 10) * step, total });
             await new Promise((r) => setTimeout(r, 600));
           }
           if (localCancelled) return emit("local:error", { id, error: "Installation annulée." });
-          localInstalled = [...localInstalled, { id, name: "Qwen3 8B", size_bytes: total, tools: true, vision: false, license: "Apache-2.0", ctx: 32768, ctx_setting: 0, auto_ctx: 32768, max_ctx: 32768, options: [{ ctx: 8192, mem_mb: 1152 }, { ctx: 16384, mem_mb: 1250 }, { ctx: 32768, mem_mb: 2442 }] }];
+          localInstalled = [...localInstalled, { id, name: label, size_bytes: total, tools: true, vision: false, license: "Apache-2.0", ctx: 32768, ctx_setting: 0, auto_ctx: 32768, max_ctx: 32768, options: [{ ctx: 8192, mem_mb: 1152 }, { ctx: 16384, mem_mb: 1250 }, { ctx: 32768, mem_mb: 2442 }] }];
           emit("local:done", { id });
         })();
         return null;

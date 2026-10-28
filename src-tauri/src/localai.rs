@@ -336,26 +336,81 @@ pub fn installed(data: &Path, hw: &Hardware) -> Vec<Installed> {
     out
 }
 
-/// Espace pris par le moteur, quand il est installé.
-pub fn engine_bytes(data: &Path) -> u64 {
-    fn size(p: &Path) -> u64 {
-        std::fs::read_dir(p).map(|d| d.flatten().map(|e| if e.path().is_dir() { size(&e.path()) } else { e.metadata().map(|m| m.len()).unwrap_or(0) }).sum()).unwrap_or(0)
-    }
-    size(&root(data).join("engine"))
+fn dir_size(p: &Path) -> u64 {
+    std::fs::read_dir(p).map(|d| d.flatten().map(|e| if e.path().is_dir() { dir_size(&e.path()) } else { e.metadata().map(|m| m.len()).unwrap_or(0) }).sum()).unwrap_or(0)
 }
 
-pub async fn remove(data: &Path, id: &str) -> Result<(), String> {
-    if id.is_empty() || id.contains(['/', '\\', '.']) {
+/// Espace pris par le moteur, quand il est installé.
+pub fn engine_bytes(data: &Path) -> u64 {
+    dir_size(&root(data).join("engine"))
+}
+
+fn valid_id(id: &str) -> bool {
+    !id.is_empty() && !id.starts_with('.') && !id.contains("..") && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+}
+
+/// Supprime un modèle installé et renvoie l'espace libéré (en octets).
+pub async fn remove(data: &Path, id: &str) -> Result<u64, String> {
+    // Les identifiants du catalogue contiennent des points (« qwen3-1.7b ») : on refuse seulement ce qui sortirait du dossier des modèles.
+    if !valid_id(id) {
         return Err("Identifiant de modèle invalide.".into());
+    }
+    if installing().as_deref() == Some(id) {
+        return Err("Ce modèle est en cours d'installation : annule d'abord l'installation.".into());
     }
     if running_model().await.as_deref() == Some(id) {
         shutdown().await;
     }
     let dir = models_dir(data).join(id);
+    let freed = dir_size(&dir);
     if dir.exists() {
         std::fs::remove_dir_all(&dir).map_err(|e| format!("Suppression impossible : {e}"))?;
     }
-    Ok(())
+    forget_ctx_setting(data, id);
+    Ok(freed)
+}
+
+/// Le réglage de contexte d'un modèle supprimé n'a plus lieu d'être.
+fn forget_ctx_setting(data: &Path, id: &str) {
+    let Some(mut v) = std::fs::read_to_string(config_path(data)).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()) else { return };
+    if let Some(ctx) = v.get_mut("ctx").and_then(|c| c.as_object_mut()) {
+        if ctx.remove(id).is_some() {
+            let _ = std::fs::write(config_path(data), serde_json::to_vec_pretty(&v).unwrap_or_default());
+        }
+    }
+}
+
+/// Ce que les téléchargements interrompus occupent : les fichiers `.part` et les dossiers de modèles jamais terminés.
+fn leftovers(data: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(models_dir(data)) {
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() && !p.join("manifest.json").exists() {
+                out.push(p);
+            }
+        }
+    }
+    if let Ok(rd) = std::fs::read_dir(root(data).join("engine")) {
+        out.extend(rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "part")));
+    }
+    out
+}
+
+pub fn partial_bytes(data: &Path) -> u64 {
+    leftovers(data).iter().map(|p| if p.is_dir() { dir_size(p) } else { p.metadata().map(|m| m.len()).unwrap_or(0) }).sum()
+}
+
+/// Supprime les téléchargements interrompus (jamais pendant une installation) et renvoie l'espace libéré.
+pub fn clean_partials(data: &Path) -> Result<u64, String> {
+    if installing().is_some() {
+        return Err("Une installation est en cours : attends la fin ou annule-la.".into());
+    }
+    let freed = partial_bytes(data);
+    for p in leftovers(data) {
+        let _ = if p.is_dir() { std::fs::remove_dir_all(&p) } else { std::fs::remove_file(&p) };
+    }
+    Ok(freed)
 }
 
 struct Running {
@@ -597,8 +652,50 @@ mod tests {
     #[tokio::test]
     async fn remove_rejects_path_tricks() {
         let tmp = std::env::temp_dir();
-        assert!(remove(&tmp, "../x").await.is_err());
-        assert!(remove(&tmp, "").await.is_err());
+        for bad in ["../x", "", "..", ".", ".cache", "a/b", "a\\b", "C:x", "a b"] {
+            assert!(remove(&tmp, bad).await.is_err(), "{bad}");
+        }
+        for id in localmodels::catalog().iter().map(|m| m.id.as_str()) {
+            assert!(valid_id(id), "l'identifiant du catalogue {id} doit être accepté");
+        }
+    }
+
+    fn data_with_models() -> PathBuf {
+        let data = std::env::temp_dir().join(format!("localai-rm-{}", uuid::Uuid::new_v4()));
+        let done = models_dir(&data).join("qwen3-1.7b");
+        std::fs::create_dir_all(&done).unwrap();
+        std::fs::write(done.join("manifest.json"), "{}").unwrap();
+        std::fs::write(done.join("model.gguf"), vec![0u8; 5000]).unwrap();
+        // Une installation interrompue : pas de manifeste, un fichier à moitié téléchargé.
+        let half = models_dir(&data).join("gemma3-4b");
+        std::fs::create_dir_all(&half).unwrap();
+        std::fs::write(half.join("model.gguf.part"), vec![0u8; 3000]).unwrap();
+        std::fs::create_dir_all(root(&data).join("engine")).unwrap();
+        std::fs::write(root(&data).join("engine").join("moteur.zip.part"), vec![0u8; 200]).unwrap();
+        data
+    }
+
+    #[tokio::test]
+    async fn removing_a_model_reports_the_space_freed_and_forgets_its_context_setting() {
+        let data = data_with_models();
+        std::fs::write(config_path(&data), r#"{"ctx":{"qwen3-1.7b":16384,"autre":8192}}"#).unwrap();
+        assert_eq!(remove(&data, "qwen3-1.7b").await.unwrap(), 5002);
+        assert!(!models_dir(&data).join("qwen3-1.7b").exists());
+        assert_eq!(ctx_setting(&data, "qwen3-1.7b"), 0);
+        assert_eq!(ctx_setting(&data, "autre"), 8192, "les autres réglages restent");
+        assert_eq!(remove(&data, "qwen3-1.7b").await.unwrap(), 0, "supprimer deux fois ne casse rien");
+        let _ = std::fs::remove_dir_all(data);
+    }
+
+    #[test]
+    fn interrupted_downloads_are_counted_and_cleaned_without_touching_installed_models() {
+        let data = data_with_models();
+        assert_eq!(partial_bytes(&data), 3200);
+        assert_eq!(clean_partials(&data).unwrap(), 3200);
+        assert_eq!(partial_bytes(&data), 0);
+        assert!(models_dir(&data).join("qwen3-1.7b").join("model.gguf").exists(), "le modèle installé est intact");
+        assert!(!models_dir(&data).join("gemma3-4b").exists());
+        let _ = std::fs::remove_dir_all(data);
     }
 
     /// Vraie installation + vrai moteur (télécharge ~1,1 Go la première fois, repris ensuite) :

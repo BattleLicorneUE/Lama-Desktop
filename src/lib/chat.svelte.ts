@@ -106,6 +106,11 @@ export type LocalInstalled = {
 export type LocalProgress = { id: string; phase: string; file: string; done: number; total: number };
 export const LOCAL_PREFIX = "local:";
 
+/** 5 027 783 488 -> « 4,7 Go » ; en dessous d'un gigaoctet, en Mo. */
+export function fmtBytes(b: number): string {
+  return b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1).replace(".", ",")} Go` : `${Math.max(1, Math.round(b / 1024 ** 2))} Mo`;
+}
+
 
 /** Modèle proposé tant qu'on n'en a pas choisi un autre : « beam » (gratuit, 1M de contexte, outils) s'il est au catalogue. */
 export const DEFAULT_MODEL = "beam";
@@ -295,6 +300,13 @@ export class ChatStore {
   /** Installation en cours (une seule à la fois) et dernière erreur d'installation. */
   localProgress = $state<LocalProgress | null>(null);
   localError = $state("");
+  /** Installations en attente (identifiants) : la suivante démarre quand la précédente se termine. */
+  localQueue = $state<string[]>([]);
+  /** Vitesse de téléchargement lissée (octets par seconde), 0 tant qu'on ne la connaît pas. */
+  localRate = $state(0);
+  /** Dernier résultat à annoncer (modèle supprimé, espace libéré…). */
+  localNotice = $state("");
+  private rateMark: { file: string; t: number; done: number } | null = null;
   /** État de la connexion à l'API cloud : « ok » seulement après un vrai test authentifié. */
   cloudStatus = $state<"none" | "checking" | "listed" | "ok" | "error">("none");
   cloudError = $state("");
@@ -829,26 +841,86 @@ export class ChatStore {
     }
   }
 
+  /** Installe un modèle, ou le met en file d'attente si une installation est déjà en cours. */
   async installLocal(id: string) {
+    if (this.localProgress) {
+      if (this.localProgress.id !== id && !this.localQueue.includes(id)) this.localQueue = [...this.localQueue, id];
+      return;
+    }
     this.localError = "";
+    await this.startLocal(id);
+  }
+
+  private async startLocal(id: string) {
+    this.localRate = 0;
+    this.rateMark = null;
     this.localProgress = { id, phase: "préparation", file: "", done: 0, total: 0 };
     try {
       await invoke("local_install", { id });
     } catch (e) {
       this.localError = String(e);
       this.localProgress = null;
+      await this.startNextLocal();
     }
+  }
+
+  /** Une installation vient de se terminer (ou d'échouer) : on passe à la suivante de la file. */
+  private async startNextLocal() {
+    const [next, ...rest] = this.localQueue;
+    this.localQueue = rest;
+    if (next && !this.localInstalled.some((m) => m.id === next)) await this.startLocal(next);
+    else if (next) await this.startNextLocal();
+  }
+
+  /** Vitesse lissée : on mesure sur au moins une demi-seconde du même fichier. */
+  private trackRate(p: LocalProgress) {
+    const now = performance.now();
+    const m = this.rateMark;
+    if (!m || m.file !== p.file || p.done < m.done) {
+      this.rateMark = { file: p.file, t: now, done: p.done };
+      this.localRate = 0;
+      return;
+    }
+    if (p.phase !== "modèle" && p.phase !== "moteur") return;
+    const dt = (now - m.t) / 1000;
+    if (dt < 0.5) return;
+    const inst = (p.done - m.done) / dt;
+    this.localRate = this.localRate ? this.localRate * 0.7 + inst * 0.3 : inst;
+    this.rateMark = { file: p.file, t: now, done: p.done };
   }
 
   cancelLocal(id: string) {
     void invoke("local_cancel", { id });
   }
 
+  /** Retire un modèle de la file d'attente. */
+  dequeueLocal(id: string) {
+    this.localQueue = this.localQueue.filter((x) => x !== id);
+  }
+
+  /** Annule l'installation en cours et vide la file. */
+  cancelAllLocal() {
+    this.localQueue = [];
+    if (this.localProgress) this.cancelLocal(this.localProgress.id);
+  }
+
   async removeLocal(id: string) {
+    const name = this.localInstalled.find((m) => m.id === id)?.name ?? id;
     try {
-      await invoke("local_remove", { id });
+      const freed = await invoke<number>("local_remove", { id });
       if (this.model === LOCAL_PREFIX + id) this.model = "";
       await this.loadLocal();
+      this.localNotice = `${name} supprimé${freed ? ` : ${fmtBytes(freed)} libérés sur le disque` : ""}.`;
+    } catch (e) {
+      this.localError = String(e);
+    }
+  }
+
+  /** Supprime les téléchargements interrompus. */
+  async cleanLocalPartials() {
+    try {
+      const freed = await invoke<number>("local_clean_partials");
+      this.localNotice = freed ? `Téléchargements interrompus supprimés : ${fmtBytes(freed)} libérés.` : "Rien à nettoyer.";
     } catch (e) {
       this.localError = String(e);
     }
@@ -1344,14 +1416,24 @@ export class ChatStore {
         const s = e.payload.id ? this.sess(e.payload.id) : undefined;
         if (s) this.addUsage(e.payload.prompt, e.payload.eval, s.model);
       }),
-      listen<LocalProgress>("local:progress", (e) => (this.localProgress = e.payload)),
-      listen<{ id: string }>("local:done", async () => {
-        this.localProgress = null;
-        await this.loadLocal();
+      listen<LocalProgress>("local:progress", (e) => {
+        this.trackRate(e.payload);
+        this.localProgress = e.payload;
       }),
-      listen<{ id: string; error: string }>("local:error", (e) => {
+      listen<{ id: string }>("local:done", async (e) => {
         this.localProgress = null;
-        this.localError = e.payload.error;
+        this.localRate = 0;
+        await this.loadLocal();
+        const name = this.localInstalled.find((m) => m.id === e.payload.id)?.name ?? e.payload.id;
+        this.localNotice = `${name} est installé.`;
+        await this.startNextLocal();
+      }),
+      listen<{ id: string; error: string }>("local:error", async (e) => {
+        this.localProgress = null;
+        this.localRate = 0;
+        if (/annulée/i.test(e.payload.error)) this.localNotice = "Installation annulée.";
+        else this.localError = e.payload.error;
+        await this.startNextLocal();
       }),
       listen<ScheduledTask>("schedule:due", (e) => void this.runTask(e.payload)),
       listen<{ id: string; prompt_tokens: number }>("chat:usage", (e) => {
