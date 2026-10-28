@@ -70,7 +70,8 @@ pub fn resolve(root: &Path, rel: &str) -> Result<PathBuf, String> {
 
 /// Les modifications ne doivent jamais toucher au dépôt git lui-même.
 pub fn is_protected(path: &Path) -> bool {
-    path.components().any(|c| c.as_os_str() == ".git")
+    // Windows ne distingue pas les majuscules : « .GIT » est le même dossier.
+    path.components().any(|c| c.as_os_str().to_string_lossy().eq_ignore_ascii_case(".git"))
 }
 
 #[cfg(test)]
@@ -127,6 +128,7 @@ mod tests {
     #[test]
     fn protects_git_dir() {
         assert!(is_protected(Path::new("C:/p/.git/config")));
+        assert!(is_protected(Path::new("C:/p/.GIT/hooks/pre-commit")));
         assert!(!is_protected(Path::new("C:/p/src/main.rs")));
     }
 }

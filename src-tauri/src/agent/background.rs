@@ -48,7 +48,7 @@ fn now_ms() -> u64 {
 }
 
 /// Arrête une commande et tous ses sous-processus (`npm run dev` en lance plusieurs).
-fn kill_tree(pid: u32) {
+pub(super) fn kill_tree(pid: u32) {
     use std::os::windows::process::CommandExt;
     let _ = std::process::Command::new("taskkill")
         .args(["/PID", &pid.to_string(), "/T", "/F"])

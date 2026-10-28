@@ -30,6 +30,14 @@
     local_model_installed: "Modèle local installé",
     local_model_failed: "Installation de modèle échouée",
     connector_added: "Connecteur ajouté",
+    local_engine_started: "Moteur local démarré",
+    local_engine_failed: "Moteur local en échec",
+    chat_error: "Réponse en erreur",
+    feature_used: "Fonction essayée",
+    settings_page: "Page de Réglages",
+    update_installed: "Mise à jour installée",
+    app_closed: "Fermeture",
+    app_panic: "Plantage",
   };
 </script>
 

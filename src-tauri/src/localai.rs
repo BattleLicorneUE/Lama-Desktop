@@ -119,7 +119,7 @@ fn sha256_of(path: &Path) -> Result<String, String> {
 }
 
 /// Télécharge `url` vers `dest` en reprenant un `.part` interrompu, puis vérifie la somme. Ne laisse `dest` que si tout est bon.
-async fn download(url: &str, dest: &Path, sha256: &str, cancel: &AtomicBool, mut progress: impl FnMut(&str, u64, u64)) -> Result<(), String> {
+pub(crate) async fn download(url: &str, dest: &Path, sha256: &str, cancel: &AtomicBool, mut progress: impl FnMut(&str, u64, u64)) -> Result<(), String> {
     if dest.exists() {
         return Ok(());
     }
@@ -181,7 +181,7 @@ async fn download(url: &str, dest: &Path, sha256: &str, cancel: &AtomicBool, mut
     std::fs::rename(&part, dest).map_err(|e| e.to_string())
 }
 
-fn unzip(zip_path: &Path, to: &Path) -> Result<(), String> {
+pub(crate) fn unzip(zip_path: &Path, to: &Path) -> Result<(), String> {
     let file = std::fs::File::open(zip_path).map_err(|e| e.to_string())?;
     let mut zip = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
     for i in 0..zip.len() {

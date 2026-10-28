@@ -230,6 +230,32 @@ async fn start_http(name: &str, url: &str, cfg: &ServerConfig, lookup: &(dyn Fn(
     Ok(server)
 }
 
+/// Le programme existe-t-il quelque part dans le PATH ? (`npx`, `uvx`… sont des .cmd ou .exe.)
+fn on_path(program: &str) -> bool {
+    let p = std::path::Path::new(program);
+    if p.components().count() > 1 {
+        return p.exists();
+    }
+    let exts: Vec<String> = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into()).split(';').map(str::to_lowercase).collect();
+    std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).any(|dir| {
+        dir.join(program).is_file() || exts.iter().any(|e| dir.join(format!("{program}{e}")).is_file())
+    })
+}
+
+/// Message clair quand le programme du connecteur n'est pas installé (sans lui, `cmd` échoue en silence).
+fn missing_program_help(program: &str) -> String {
+    let base = program.trim().trim_matches('"').to_lowercase();
+    let tool = match base.as_str() {
+        "uvx" | "uv" => Some(("uv", "https://docs.astral.sh/uv/getting-started/installation/")),
+        "npx" | "node" | "npm" => Some(("Node.js", "https://nodejs.org/")),
+        _ => None,
+    };
+    match tool {
+        Some((name, url)) => format!("« {program} » est introuvable sur ce PC : ce connecteur a besoin de {name} ({url}). Installe-le, puis ferme et rouvre Lama Desktop pour qu'il le trouve."),
+        None => format!("« {program} » est introuvable sur ce PC. Vérifie le nom de la commande ou son installation, puis ferme et rouvre Lama Desktop."),
+    }
+}
+
 async fn start_server(name: &str, cfg: &ServerConfig, lookup: &(dyn Fn(&str) -> Option<String> + Sync)) -> Result<Server, String> {
     if let Some(url) = cfg.url.as_deref().filter(|u| !u.trim().is_empty()) {
         return start_http(name, url, cfg, lookup).await;
@@ -237,13 +263,30 @@ async fn start_server(name: &str, cfg: &ServerConfig, lookup: &(dyn Fn(&str) -> 
     if cfg.command.trim().is_empty() {
         return Err("Serveur sans « command » ni « url ».".into());
     }
+    // uv absent du PC : Lama télécharge sa propre copie (vérifiée) au lieu de demander une installation.
+    let program = cfg.command.trim().trim_matches('"');
+    let mut extra_path: Option<std::path::PathBuf> = None;
+    if !on_path(program) {
+        if matches!(program.to_lowercase().as_str(), "uvx" | "uv") {
+            extra_path = Some(crate::uvrt::ensure().await?);
+        } else {
+            return Err(missing_program_help(&cfg.command));
+        }
+    }
     let args: Vec<String> = cfg.args.iter().map(|a| expand_secrets(a, lookup)).collect::<Result<_, _>>()?;
     let env: HashMap<String, String> = cfg.env.iter().map(|(k, v)| expand_secrets(v, lookup).map(|v| (k.clone(), v))).collect::<Result<_, _>>()?;
     // `npx`, `uvx`… sont des .cmd sous Windows : on passe par cmd.exe.
     let mut cmd = Command::new("cmd");
     cmd.arg("/C").arg(&cfg.command).args(&args);
-    cmd.envs(&env)
-        .stdin(std::process::Stdio::piped())
+    cmd.envs(&env);
+    if let Some(dir) = &extra_path {
+        let mut paths = vec![dir.clone()];
+        paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
+        if let Ok(joined) = std::env::join_paths(paths) {
+            cmd.env("PATH", joined);
+        }
+    }
+    cmd.stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .kill_on_drop(true)
@@ -374,6 +417,16 @@ impl McpHub {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_missing_program_is_explained_instead_of_failing_silently() {
+        assert!(!super::on_path("programme-qui-n-existe-pas-xyz"));
+        assert!(super::on_path("cmd"), "cmd est toujours dans le PATH de Windows");
+        let uv = super::missing_program_help("uvx");
+        assert!(uv.contains("uv") && uv.contains("astral.sh") && uv.contains("rouvre"), "{uv}");
+        assert!(super::missing_program_help("npx").contains("Node.js"));
+        assert!(super::missing_program_help("autre").contains("introuvable"));
+    }
+
     use super::*;
 
     #[test]
@@ -536,5 +589,25 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.servers["fs"].args.len(), 2);
+    }
+
+    /// Vrai Blender ouvert avec l'extension MCP, et un PC sans uv : `cargo test blender_through_lama -- --ignored --nocapture`.
+    #[tokio::test]
+    #[ignore]
+    async fn blender_through_lama_with_its_own_uv() {
+        let dir = std::env::temp_dir().join(format!("mcpblender-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        crate::uvrt::set_data_dir(&dir);
+        let path = dir.join("mcp.json");
+        let entry = crate::connectors::catalog().into_iter().find(|c| c.id == "blender").unwrap();
+        std::fs::write(&path, json!({ "mcpServers": { "blender": { "command": entry.command, "args": entry.args } } }).to_string()).unwrap();
+        let hub = McpHub::start(&path, "test-blender").await;
+        assert_eq!(hub.status[0].error, None, "{:?}", hub.status);
+        println!("{} outils : {:?}", hub.status[0].tools.len(), hub.status[0].tools);
+        let (server, tool) = hub.resolve("mcp__blender__get_objects_summary").expect("outil absent");
+        let out = hub.call(&server, &tool, json!({})).await.unwrap();
+        println!("réponse de Blender ({} caractères) : {}", out.len(), out.chars().take(120).collect::<String>());
+        assert!(!out.to_lowercase().contains("connection refused"), "{out}");
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

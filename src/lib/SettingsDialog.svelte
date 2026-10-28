@@ -110,6 +110,11 @@
     update: { title: "Mises à jour", intro: "La version installée et les nouveautés." },
   };
 
+  // Statistiques anonymes (si acceptées) : quelles pages servent. Seul le nom de la page part.
+  $effect(() => {
+    void invoke("analytics_ui", { event: "settings_page", value: tab }).catch(() => {});
+  });
+
   function go(it: Item) {
     tab = it.id;
     msg = "";

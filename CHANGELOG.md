@@ -4,9 +4,26 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), ver
 
 ## [Non publié]
 
+## [0.3.1] - 2026-10-28
+
 ### Ajouté
 - **Statistiques anonymes, uniquement si tu acceptes** : une demande au premier lancement et une page dans les Réglages qui liste ce qui peut partir et ce qui a été envoyé. Aucun contenu de conversation, aucun identifiant conservé.
-- **Connecteur Blender** (serveur MCP officiel de Blender Lab) : lire la scène, lancer du code Python, faire des rendus et consulter la documentation. Nécessite l'extension MCP dans Blender, Git et uv.
+  Elles couvrent le lancement et la fermeture, les modèles utilisés, les fonctions essayées, le démarrage du moteur local, le type des erreurs de réponse (jamais leur texte) et les plantages internes (fichier et ligne seulement).
+- **Connecteur Blender** (serveur MCP officiel de Blender Lab) : lire la scène, lancer du code Python, faire des rendus et consulter la documentation. Nécessite l'extension MCP dans Blender et Git.
+- **Réglages réorganisés** en six groupes et dix-sept pages, avec une phrase d'explication sur chaque page, une recherche par mots-clés et des textes réécrits.
+
+### Corrigé (sécurité)
+- **Dépôts git piégés** : un dépôt récupéré ailleurs pouvait lancer un programme à chaque consultation de son état ou de ses différences (réglages `fsmonitor`, diff externe, filtres de texte). Ces réglages sont désormais neutralisés.
+- **Liens vers des fichiers privés** : la revue de code ne suit plus les liens symboliques des fichiers neufs, qui auraient pu envoyer un fichier hors du projet au modèle.
+- **Ouverture de fichiers** : un nom comme `programme.exe.` (point ou espace final, ignoré par Windows) passait la liste des fichiers interdits ; la liste est aussi plus complète (`.url`, `.msc`, `.settingcontent-ms`…).
+- **Enregistrement de fichiers** : les programmes et les dossiers de démarrage automatique sont refusés.
+- **Dossier `.git`** protégé quelle que soit la casse (`.GIT`).
+- **Recherche web** : plages réservées (réseau de test, multicast, NAT64) ajoutées aux adresses refusées.
+
+### Corrigé
+- **Connecteurs Python sans installation** (Blender, pages web, Unity…) : si `uv` n'est pas sur le PC, Lama télécharge sa propre copie, vérifiée par somme de contrôle, au premier besoin. Si un programme manque (`uvx`, `npx`…), l'erreur le dit clairement au lieu d'échouer en silence.
+- Une commande de l'agent arrêtée par le délai arrête maintenant aussi ses sous-processus.
+- Les statistiques ouvrent une nouvelle session après une heure d'inactivité, sinon le service refusait les événements d'une application restée ouverte longtemps.
 
 ## [0.3.0] - 2026-10-26
 

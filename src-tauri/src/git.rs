@@ -27,7 +27,9 @@ pub struct GitStatus {
 
 fn run(root: &Path, args: &[&str], ok_codes: &[i32]) -> Result<String, String> {
     let mut cmd = Command::new("git");
-    cmd.arg("-C").arg(root).args(["-c", "core.quotepath=false"]).args(args);
+    // Un dépôt piégé peut déclarer dans sa configuration un programme à lancer à chaque `git status` (fsmonitor)
+    // ou à chaque diff (diff externe, filtres de texte) : on neutralise ces réglages, quelle que soit la configuration du dépôt.
+    cmd.arg("-C").arg(root).args(["-c", "core.quotepath=false", "-c", "core.fsmonitor=false", "-c", "core.pager=cat"]).args(args);
     cmd.env("GIT_TERMINAL_PROMPT", "0").env("LC_ALL", "C").stdin(Stdio::null());
     #[cfg(windows)]
     {
@@ -113,10 +115,10 @@ pub fn diff(root: &Path, rel: &str) -> Result<String, String> {
     let rel = path.strip_prefix(&root_c).map_err(|_| "Chemin hors du projet.".to_string())?.to_string_lossy().replace('\\', "/");
     let tracked = run(root, &["ls-files", "--error-unmatch", "--", &rel], &[]).is_ok();
     let text = if tracked {
-        run(root, &["diff", "HEAD", "--", &rel], &[]).or_else(|_| run(root, &["diff", "--", &rel], &[]))?
+        run(root, &["diff", "--no-ext-diff", "--no-textconv", "HEAD", "--", &rel], &[]).or_else(|_| run(root, &["diff", "--no-ext-diff", "--no-textconv", "--", &rel], &[]))?
     } else {
         // Code de sortie 1 = « des différences existent » : normal ici.
-        run(root, &["diff", "--no-index", "--", "/dev/null", &rel], &[1])?
+        run(root, &["diff", "--no-index", "--no-ext-diff", "--no-textconv", "--", "/dev/null", &rel], &[1])?
     };
     Ok(cap(text))
 }
@@ -134,15 +136,16 @@ pub fn review_diff(root: &Path) -> Result<String, String> {
     if run(root, &["rev-parse", "--is-inside-work-tree"], &[]).is_err() {
         return Err("Ce dossier n'est pas un dépôt git : la revue relit les changements git.".into());
     }
-    let mut text = match run(root, &["diff", "HEAD"], &[]) {
+    let mut text = match run(root, &["diff", "--no-ext-diff", "--no-textconv", "HEAD"], &[]) {
         Ok(t) => t,
         // Dépôt sans aucun commit : pas de HEAD.
-        Err(_) => run(root, &["diff", "--cached"], &[])? + &run(root, &["diff"], &[])?,
+        Err(_) => run(root, &["diff", "--no-ext-diff", "--no-textconv", "--cached"], &[])? + &run(root, &["diff", "--no-ext-diff", "--no-textconv"], &[])?,
     };
     let list = run(root, &["ls-files", "--others", "--exclude-standard", "-z"], &[])?;
     for rel in list.split('\0').filter(|s| !s.is_empty()).take(40) {
-        let Ok(meta) = std::fs::metadata(root.join(rel)) else { continue };
-        if meta.len() > 100_000 || is_noise(rel) {
+        // `symlink_metadata` : un lien (ou une jonction) vers un fichier privé hors du projet ne doit pas être lu et envoyé au modèle.
+        let Ok(meta) = std::fs::symlink_metadata(root.join(rel)) else { continue };
+        if !meta.is_file() || meta.len() > 100_000 || is_noise(rel) {
             continue;
         }
         let Ok(content) = std::fs::read_to_string(root.join(rel)) else { continue }; // binaire : ignoré
@@ -246,6 +249,30 @@ mod tests {
             run(&d, args, &[]).unwrap();
         }
         d
+    }
+
+    /// Un dépôt qui déclare un programme à lancer à chaque `git status` ne doit rien lancer via l'application.
+    #[test]
+    fn a_booby_trapped_repository_cannot_start_programs() {
+        if !git_available() {
+            return;
+        }
+        let d = repo();
+        std::fs::write(d.join("a.txt"), "un\n").unwrap();
+        let marker = d.join("lance.txt");
+        let hook = format!("touch {}", marker.display().to_string().replace('\\', "/"));
+        run(&d, &["config", "core.fsmonitor", &hook], &[]).unwrap();
+        // Contrôle : git lancé tel quel exécute bien le programme (sinon ce test ne prouverait rien).
+        let _ = Command::new("git").arg("-C").arg(&d).args(["status", "--porcelain"]).output();
+        let trap_works = marker.exists();
+        let _ = std::fs::remove_file(&marker);
+        status(&d).unwrap();
+        review_diff(&d).ok();
+        assert!(!marker.exists(), "le programme du dépôt a été lancé par l'application");
+        if !trap_works {
+            eprintln!("(cette version de git n'a pas lancé le piège de contrôle)");
+        }
+        let _ = std::fs::remove_dir_all(d);
     }
 
     #[test]

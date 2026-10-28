@@ -56,7 +56,17 @@ const APPS: &[(&str, &str)] = &[
 ];
 
 /// Extensions qui exécuteraient du code : refusées (on ouvre des documents, pas des programmes).
-const EXECUTABLE: &[&str] = &["exe", "bat", "cmd", "com", "msi", "ps1", "vbs", "vbe", "js", "jse", "wsf", "scr", "lnk", "reg", "hta", "jar", "dll", "cpl"];
+const EXECUTABLE: &[&str] = &[
+    "exe", "bat", "cmd", "com", "msi", "msp", "mst", "ps1", "psm1", "psd1", "ps1xml", "psc1", "vbs", "vbe", "vb", "js", "jse", "wsf", "wsh", "wsc", "ws", "sct", "scr", "lnk", "url",
+    "reg", "hta", "jar", "jnlp", "dll", "ocx", "sys", "cpl", "msc", "pif", "gadget", "appref-ms", "application", "scf", "settingcontent-ms", "library-ms", "search-ms",
+    "diagcab", "xll", "wll", "msix", "msixbundle", "appx", "appxbundle", "appinstaller", "chm", "inf", "py", "pyw", "pyz",
+];
+
+/// Extension telle que Windows la comprend : « virus.exe. » et « virus.exe␠ » sont ouverts comme « virus.exe ».
+fn real_extension(path: &Path) -> String {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").trim_end_matches(['.', ' ']);
+    name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default()
+}
 
 fn powershell(script: &str) -> Result<String, String> {
     let out = Command::new("powershell")
@@ -196,7 +206,7 @@ pub fn open(target: &str) -> Result<String, String> {
     }
     let path = Path::new(target);
     if path.exists() {
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+        let ext = real_extension(path);
         if path.is_file() && EXECUTABLE.contains(&ext.as_str()) {
             return Err(format!("Refusé : un fichier .{ext} exécuterait du code. Seuls les documents et dossiers peuvent être ouverts."));
         }
@@ -412,6 +422,16 @@ pub fn find_files(roots: &[PathBuf], query: &str) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn trailing_dots_and_spaces_do_not_hide_an_executable() {
+        for (name, ext) in [("a/virus.exe.", "exe"), ("a/virus.exe ", "exe"), ("a/x.EXE", "exe"), ("a/note.txt", "txt"), ("a/sans-extension", ""), ("a/raccourci.url", "url")] {
+            assert_eq!(super::real_extension(std::path::Path::new(name)), ext, "{name}");
+        }
+        for ext in ["exe", "url", "msc", "settingcontent-ms", "hta", "ps1"] {
+            assert!(super::EXECUTABLE.contains(&ext), "{ext}");
+        }
+    }
+
     use super::*;
 
     #[test]

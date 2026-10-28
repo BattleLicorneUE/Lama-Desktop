@@ -483,6 +483,9 @@ where
                 None => break,
             },
             _ = &mut deadline => {
+                if let Some(pid) = child.id() {
+                    super::background::kill_tree(pid);
+                }
                 return Err(format!(
                     "Commande interrompue après {} s.\n{}",
                     EXEC_TIMEOUT.as_secs(),

@@ -89,7 +89,7 @@ fn git_status(root: &Path) -> Option<String> {
         return None;
     }
     let out = std::process::Command::new("git")
-        .args(["status", "--short", "--branch"])
+        .args(["-c", "core.fsmonitor=false", "status", "--short", "--branch"])
         .current_dir(root)
         .creation_flags(0x0800_0000)
         .output()

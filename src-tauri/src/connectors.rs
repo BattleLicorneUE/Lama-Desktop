@@ -93,9 +93,9 @@ pub fn catalog() -> Vec<Connector> {
             "1. Dans Unity (2021.3 ou plus récent) : Window, Package Manager, « + », « Add package from git URL », colle https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main\n2. Garde l'éditeur ouvert : le plugin se connecte tout seul au serveur (vérifie l'état dans Window, MCP for Unity).\n3. Ajoute ce connecteur ici.", "https://github.com/CoplayDev/unity-mcp",
         ),
         c(
-            "blender", "Blender", "Piloter Blender : lire la scène, lancer du code Python (bpy), faire des rendus et consulter la documentation officielle. Prévois un bon modèle : il écrit du code Python pour agir.", "Création 3D", "uv", "uvx",
+            "blender", "Blender", "Piloter Blender : lire la scène, lancer du code Python (bpy), faire des rendus et consulter la documentation officielle. Beaucoup d'outils (≈ 26) et un bon modèle conseillé : il écrit du code Python pour agir.", "Création 3D", "uv", "uvx",
             &["--from", "git+https://projects.blender.org/lab/blender_mcp.git#subdirectory=mcp", "blender-mcp"], &[], &[],
-            "1. Il faut Git et uv installés sur ce PC (le serveur est téléchargé au premier lancement, ça peut prendre une minute).\n2. Dans Blender : Édition, Préférences, Extensions, « Dépôts », ajoute le dépôt https://lab.blender.org/ (menu « + »).\n3. Cherche l'extension « MCP » dans la liste, installe-la et active-la.\n4. Garde Blender ouvert avec ta scène, puis ajoute ce connecteur.", "https://www.blender.org/lab/mcp-server/",
+            "1. Il faut Git sur ce PC. Le reste (uv, le serveur) est téléchargé tout seul au premier lancement, ça peut prendre une minute.\n2. Dans Blender : Édition, Préférences, Extensions, « Dépôts », ajoute le dépôt https://lab.blender.org/ (menu « + »).\n3. Cherche l'extension « MCP » dans la liste, installe-la et active-la.\n4. Garde Blender ouvert avec ta scène, puis ajoute ce connecteur.", "https://www.blender.org/lab/mcp-server/",
         ),
         web(
             "unreal-58", "Unreal Engine 5.8 (officiel)", "Serveur MCP intégré à l'éditeur : acteurs, niveaux, matériaux, Blueprints, tests. Le modèle découvre les outils à la demande (3 outils seulement dans son contexte).", "Jeu vidéo",

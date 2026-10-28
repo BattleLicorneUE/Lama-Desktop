@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 
@@ -42,6 +43,7 @@ class Updater {
   async install() {
     if (!this.update || this.status === "installing") return;
     this.status = "installing";
+    void invoke("analytics_ui", { event: "update_installed", value: this.current || "inconnue" }).catch(() => {});
     this.done = 0;
     this.total = 0;
     try {

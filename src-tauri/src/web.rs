@@ -79,10 +79,17 @@ pub fn is_private_ip(ip: IpAddr) -> bool {
             v.is_private() || v.is_loopback() || v.is_link_local() || v.is_unspecified() || v.is_broadcast()
                 // 100.64.0.0/10 (réseau opérateur) et 0.0.0.0/8
                 || (o[0] == 100 && (o[1] & 0xc0) == 64) || o[0] == 0
+                // 192.0.0.0/24 (protocoles IETF), 198.18.0.0/15 (tests), multicast et réservé (224.0.0.0 et au-dessus)
+                || (o[0] == 192 && o[1] == 0 && o[2] == 0) || (o[0] == 198 && (o[1] & 0xfe) == 18) || o[0] >= 224
         }
         IpAddr::V6(v) => {
             if let Some(v4) = v.to_ipv4() {
                 return is_private_ip(IpAddr::V4(v4));
+            }
+            // 64:ff9b::/96 (NAT64) enveloppe une IPv4 dans ses 32 derniers bits.
+            let s = v.segments();
+            if s[0] == 0x64 && s[1] == 0xff9b && s[2..6] == [0, 0, 0, 0] {
+                return is_private_ip(IpAddr::V4(std::net::Ipv4Addr::new((s[6] >> 8) as u8, s[6] as u8, (s[7] >> 8) as u8, s[7] as u8)));
             }
             v.is_loopback() || v.is_unspecified() || (v.segments()[0] & 0xfe00) == 0xfc00 || (v.segments()[0] & 0xffc0) == 0xfe80
         }
@@ -419,6 +426,11 @@ mod tests {
         }
         assert!(check_url("https://93.184.216.34/").is_ok());
         assert!(!is_private_ip("8.8.8.8".parse().unwrap()) && !is_private_ip("2606:4700::1111".parse().unwrap()));
+        // Plages réservées, multicast et NAT64 qui enveloppe une adresse locale.
+        for bad in ["192.0.0.8", "198.18.0.1", "198.19.255.255", "224.0.0.1", "255.255.255.255", "64:ff9b::7f00:1", "64:ff9b::a00:1"] {
+            assert!(is_private_ip(bad.parse().unwrap()), "{bad}");
+        }
+        assert!(!is_private_ip("64:ff9b::808:808".parse().unwrap()), "NAT64 vers une adresse publique");
     }
 
     #[tokio::test]

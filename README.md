@@ -71,7 +71,7 @@ Pour signaler un problème de sécurité, ouvre une issue sans y mettre d'inform
 ## Statistiques anonymes (facultatif)
 Au premier lancement, Lama te demande si tu veux l'aider à s'améliorer. **Sans ton accord, rien n'est envoyé.** Tu peux changer d'avis dans Réglages, Statistiques anonymes.
 
-- **Ce qui part** : le lancement (avec la mémoire et le type de carte graphique du PC, en tranches), le fait qu'un message ou une tâche d'agent a été lancé avec tel modèle, l'installation d'un modèle local (réussie ou non) et l'ajout d'un connecteur du catalogue.
+- **Ce qui part** : le lancement et la fermeture (avec la mémoire et le type de carte graphique du PC, en tranches), le modèle utilisé pour un message ou une tâche d'agent, les fonctions essayées (sauvegarde, tâche planifiée, coffre…), l'installation d'un modèle local et le temps de démarrage du moteur, l'ajout d'un connecteur, les pages de Réglages ouvertes, le type des erreurs de réponse (jamais leur texte) et les plantages internes (fichier et ligne du code).
 - **Ce qui ne part jamais** : le texte des conversations, les fichiers, la mémoire, les clés et mots de passe, les noms de projets, le nom du PC ou du compte Windows.
 - **Aucun identifiant n'est gardé** d'un lancement à l'autre.
 - Le service utilisé est [Aptabase](https://aptabase.com). Les réglages affichent la liste exacte des événements et ce qui a été envoyé depuis le lancement.

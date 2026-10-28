@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Lama Desktop",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "identifier": "com.battl.ollamadesktop",
   "build": {
     "beforeDevCommand": "npm run dev",

@@ -24,12 +24,61 @@ pub const EVENTS: &[(&str, &str)] = &[
     ("local_model_installed", "Un modèle local installé : son nom dans le catalogue."),
     ("local_model_failed", "Une installation de modèle local qui a échoué : son nom dans le catalogue."),
     ("connector_added", "Un connecteur ajouté depuis le catalogue : son nom dans le catalogue."),
+    ("local_engine_started", "Le moteur local a démarré : le modèle, la taille de contexte et le temps de démarrage."),
+    ("local_engine_failed", "Le moteur local n'a pas pu démarrer : le modèle."),
+    ("chat_error", "Une réponse qui a échoué : seulement le type d'erreur (clé refusée, limite atteinte, réseau…), jamais le message."),
+    ("feature_used", "Une fonction essayée (sauvegarde, tâche planifiée, coffre, nouvelle fenêtre…) : son nom, jamais son contenu."),
+    ("settings_page", "Une page des Réglages ouverte : son nom."),
+    ("update_installed", "Une mise à jour installée : la version précédente."),
+    ("app_closed", "La fermeture de l'application : la durée d'utilisation en minutes."),
+    ("app_panic", "Un plantage interne : le fichier et la ligne du code concerné, jamais de données."),
 ];
+
+/// Commandes de l'application comptées comme « fonction essayée » : le nom de la commande, jamais ses arguments.
+pub const FEATURES: &[(&str, &str)] = &[
+    ("data_backup", "backup"), ("data_restore", "restore"), ("data_export_chats", "export_chats"), ("export_document", "export_document"),
+    ("skill_create", "skill_created"), ("skills_import", "skill_imported"), ("agent_create", "agent_created"), ("agents_import_claude", "agents_imported"),
+    ("project_create", "project_created"), ("project_from_template", "project_from_template"), ("schedule_save", "task_scheduled"),
+    ("vault_create", "vault_created"), ("vault_fill_ui", "vault_fill"), ("vault_browser_login", "vault_browser_login"),
+    ("window_new", "new_window"), ("mcp_add_custom", "custom_server"), ("mcp_import", "mcp_import"), ("voice_dictation", "voice"),
+    ("conv_fork", "conversation_fork"), ("artifact_save", "artifact_saved"), ("git_commit", "git_commit"), ("git_review_diff", "code_review"),
+    ("profile_create", "profile_created"), ("agent_undo", "undo"), ("term_run", "terminal"), ("browser_launch_ui", "browser"),
+    ("skills_hub_browse", "skills_hub"), ("memory_add", "memory_added"), ("pc_set", "pc_control"), ("local_set_ctx", "local_context"),
+    ("data_erase", "erase_all"),
+];
+
+/// Nom de la fonction pour une commande, si elle fait partie de la liste.
+pub fn feature_of(command: &str) -> Option<&'static str> {
+    FEATURES.iter().find(|(c, _)| *c == command).map(|(_, f)| *f)
+}
+
+/// Type d'une erreur de réponse, sans jamais garder son texte.
+pub fn error_kind(msg: &str) -> &'static str {
+    let m = msg.to_lowercase();
+    if m.contains("401") || m.contains("403") || m.contains("clé") || m.contains("unauthorized") {
+        "auth"
+    } else if m.contains("429") || m.contains("limite") || m.contains("rate") {
+        "rate_limit"
+    } else if m.contains("modèle local") || m.contains("moteur") || m.contains("llama") {
+        "local_engine"
+    } else if m.contains("timed out") || m.contains("timeout") || m.contains("délai") {
+        "timeout"
+    } else if m.contains("dns") || m.contains("connect") || m.contains("réseau") || m.contains("network") {
+        "network"
+    } else if m.contains("500") || m.contains("502") || m.contains("503") || m.contains("504") {
+        "server"
+    } else {
+        "other"
+    }
+}
 
 const LOG_MAX: usize = 50;
 
 static LOG: Mutex<VecDeque<Sent>> = Mutex::new(VecDeque::new());
-static SESSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+/// Session en cours et date de son dernier événement : Aptabase en veut une nouvelle après une heure sans activité.
+static SESSION: Mutex<(String, u64)> = Mutex::new((String::new(), 0));
+static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+static CONTEXT: std::sync::OnceLock<(std::path::PathBuf, String)> = std::sync::OnceLock::new();
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
 pub struct Consent {
@@ -150,8 +199,36 @@ fn now_secs() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
-fn session() -> &'static str {
-    SESSION.get_or_init(|| format!("{}{:08}", now_secs(), uuid::Uuid::new_v4().as_u128() % 100_000_000))
+fn session(now: u64) -> String {
+    let mut s = SESSION.lock().unwrap_or_else(|e| e.into_inner());
+    if s.0.is_empty() || now.saturating_sub(s.1) > 3600 {
+        s.0 = format!("{now}{:08}", uuid::Uuid::new_v4().as_u128() % 100_000_000);
+    }
+    s.1 = now;
+    s.0.clone()
+}
+
+/// À appeler au démarrage : mémorise le dossier et la version pour les événements envoyés sans accès à l'application (plantages).
+pub fn init(dir: &Path, version: &str) {
+    let _ = STARTED.set(std::time::Instant::now());
+    let _ = CONTEXT.set((dir.to_path_buf(), version.to_string()));
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if let Some((dir, version)) = CONTEXT.get() {
+            // Seulement l'endroit du code : le message d'un plantage peut contenir des données.
+            let at = info
+                .location()
+                .map(|l| format!("{}:{}", l.file().rsplit(['/', '\\']).next().unwrap_or(""), l.line()))
+                .unwrap_or_default();
+            track(dir, version, "app_panic", json!({ "at": at }));
+        }
+        previous(info);
+    }));
+}
+
+/// Minutes depuis le lancement.
+pub fn minutes_open() -> u64 {
+    STARTED.get().map_or(0, |t| t.elapsed().as_secs() / 60)
 }
 
 /// Envoie un événement si, et seulement si, une clé est intégrée, l'utilisateur a dit oui et le nom est dans la liste.
@@ -169,12 +246,28 @@ pub fn track(dir: &Path, version: &str, name: &'static str, props: Value) {
         }
         log.push_back(Sent { t: now, name: name.to_string(), props: props.clone() });
     }
-    let body = payload(name, &props, session(), now, version);
+    let body = payload(name, &props, &session(now), now, version);
     tauri::async_runtime::spawn(async move {
         // Une statistique perdue n'a aucune importance : aucune erreur n'est remontée.
-        let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_secs(10)).build() else { return };
-        let _ = client.post(format!("{host}/api/v0/event")).header("App-Key", APP_KEY).json(&body).send().await;
+        let _ = post(host, &body).await;
     });
+}
+
+/// Envoie l'événement et attend la réponse : à la fermeture, pour ne pas le perdre.
+pub fn track_blocking(dir: &Path, version: &str, name: &'static str, props: Value) {
+    if APP_KEY.is_empty() || !EVENTS.iter().any(|(n, _)| *n == name) || !consent(dir).enabled {
+        return;
+    }
+    let Some(host) = host(APP_KEY) else { return };
+    let now = now_secs();
+    let body = payload(name, &clean(props), &session(now), now, version);
+    let _ = tauri::async_runtime::block_on(async { tokio::time::timeout(std::time::Duration::from_secs(3), post(host, &body)).await });
+}
+
+/// Code HTTP de la réponse du serveur.
+async fn post(host: &str, body: &Value) -> Result<u16, reqwest::Error> {
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(10)).build()?;
+    Ok(client.post(format!("{host}/api/v0/event")).header("App-Key", APP_KEY).json(body).send().await?.status().as_u16())
 }
 
 #[cfg(test)]
@@ -236,6 +329,38 @@ mod tests {
         assert_eq!(b["sessionId"], "123");
         assert_eq!(b["systemProps"]["appVersion"], "0.3.1");
         assert_eq!(b["props"]["kind"], "cloud");
+    }
+
+    #[test]
+    fn a_session_lasts_until_an_hour_without_activity() {
+        let a = session(10_000_000_000);
+        assert_eq!(a, session(10_000_000_000 + 3_000), "dans l'heure : même session");
+        assert_ne!(a, session(10_000_000_000 + 3_000 + 3_601), "plus d'une heure : nouvelle session");
+    }
+
+    #[test]
+    fn features_are_known_commands_only_and_errors_lose_their_text() {
+        assert_eq!(feature_of("data_backup"), Some("backup"));
+        assert_eq!(feature_of("chat_start"), None);
+        assert_eq!(feature_of("secret_get"), None);
+        assert_eq!(error_kind("HTTP 401 : clé API refusée"), "auth");
+        assert_eq!(error_kind("429 Too Many Requests"), "rate_limit");
+        assert_eq!(error_kind("Modèle local inconnu : x"), "local_engine");
+        assert_eq!(error_kind("operation timed out"), "timeout");
+        assert_eq!(error_kind("secret du client ABC"), "other");
+    }
+
+    /// Envoie un vrai événement de test (marqué « debug », donc séparé des vraies statistiques) : `cargo test live_event -- --ignored`.
+    #[test]
+    #[ignore]
+    fn live_event_is_accepted_by_aptabase() {
+        if APP_KEY.is_empty() {
+            return;
+        }
+        let now = now_secs();
+        let body = payload("app_started", &json!({ "verif": "test" }), &session(now), now, "test");
+        let status = tauri::async_runtime::block_on(post(host(APP_KEY).unwrap(), &body)).unwrap();
+        assert_eq!(status, 200);
     }
 
     #[test]

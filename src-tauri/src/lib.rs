@@ -19,6 +19,7 @@ mod reminders;
 mod schedules;
 mod analytics;
 mod appsettings;
+mod uvrt;
 mod secrets;
 mod system;
 mod hardware;
@@ -123,7 +124,18 @@ async fn client_for_model(app: &AppHandle, api_key: &str, model: &str) -> Result
     let data = app_root(app).map_err(|e| OllamaError::Status(500, e))?;
     let model = localmodels::catalog().into_iter().find(|m| m.id == id).ok_or_else(|| OllamaError::Status(404, format!("Modèle local inconnu : {id}")))?;
     let ctx = localai::effective_ctx(&data, &model, &hardware::cached().await);
-    let (port, key) = localai::ensure_running(&data, id, ctx).await.map_err(|e| OllamaError::Status(500, e))?;
+    let started = std::time::Instant::now();
+    let (port, key) = match localai::ensure_running(&data, id, ctx).await {
+        Ok(r) => r,
+        Err(e) => {
+            track(app, "local_engine_failed", serde_json::json!({ "model": id }));
+            return Err(OllamaError::Status(500, e));
+        }
+    };
+    // Un modèle déjà chargé répond tout de suite : seul un vrai démarrage est intéressant.
+    if started.elapsed().as_secs() >= 2 {
+        track(app, "local_engine_started", serde_json::json!({ "model": id, "ctx": ctx, "secondes": started.elapsed().as_secs() }));
+    }
     localai::touch().await;
     OllamaClient::local(port, &key).map_err(|e| OllamaError::Status(500, e))
 }
@@ -241,6 +253,7 @@ async fn chat_start(
         let client = match client_for_model(&app, &cloud_key, &model).await {
             Ok(c) => c,
             Err(e) => {
+                track_error(&app, &e.to_string(), &model);
                 let _ = app.emit("chat:error", serde_json::json!({ "id": rid, "error": e.to_string() }));
                 running.lock().await.remove(&rid);
                 return;
@@ -261,6 +274,7 @@ async fn chat_start(
             })
             .await;
         if let Err(e) = result {
+            track_error(&app, &e.to_string(), &model);
             let _ = app.emit("chat:error", serde_json::json!({ "id": rid, "error": e.to_string() }));
         }
         running.lock().await.remove(&rid);
@@ -321,6 +335,7 @@ async fn agent_start(
     let agent_state = state.agent_of(window.label());
     let hub = state.mcp.lock().await.clone();
     let rid = request_id.clone();
+    let model_name = model.clone();
     let handle = tokio::spawn(async move {
         let params = agent::RunParams {
             request_id: rid.clone(),
@@ -339,6 +354,7 @@ async fn agent_start(
             project_id,
         };
         if let Err(e) = agent::run(app.clone(), ollama, agent_state, hub, params).await {
+            track_error(&app, &e.to_string(), &model_name);
             let _ = app.emit("chat:error", serde_json::json!({ "id": rid, "error": e.to_string() }));
         }
         running.lock().await.remove(&rid);
@@ -362,6 +378,25 @@ async fn agent_inject(window: tauri::Window, state: State<'_, AppState>, request
 fn track(app: &AppHandle, name: &'static str, props: serde_json::Value) {
     if let Ok(dir) = app_root(app) {
         analytics::track(&dir, &app.package_info().version.to_string(), name, props);
+    }
+}
+
+/// Une réponse a échoué : on garde seulement le type d'erreur, jamais son texte.
+fn track_error(app: &AppHandle, msg: &str, model: &str) {
+    track(app, "chat_error", serde_json::json!({ "kind": analytics::error_kind(msg), "local": model.starts_with("local:") }));
+}
+
+/// Événements venant de l'interface : pages de Réglages ouvertes et mises à jour installées (valeurs courtes, sans espaces).
+#[tauri::command]
+fn analytics_ui(app: AppHandle, event: String, value: String) {
+    let ok = !value.is_empty() && value.len() <= 24 && value.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'));
+    if !ok {
+        return;
+    }
+    match event.as_str() {
+        "settings_page" => track(&app, "settings_page", serde_json::json!({ "page": value })),
+        "update_installed" => track(&app, "update_installed", serde_json::json!({ "from": value })),
+        _ => {}
     }
 }
 
@@ -714,6 +749,21 @@ fn reveal_file(path: String) -> Result<(), String> {
     std::process::Command::new("explorer").arg(format!("/select,{}", p.display())).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
+/// Refuse d'écrire un programme ou un fichier de démarrage automatique : l'enregistrement sert aux documents, images et exports.
+fn check_save_target(path: &str) -> Result<(), String> {
+    let p = std::path::Path::new(path.trim());
+    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("").trim_end_matches(['.', ' ']).to_ascii_lowercase();
+    let ext = name.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
+    if ["exe", "dll", "msi", "scr", "lnk", "url", "hta", "cpl", "pif", "com", "sys"].contains(&ext) {
+        return Err(format!("Enregistrement refusé : un fichier .{ext} serait un programme."));
+    }
+    let lower = path.to_lowercase().replace('/', "\\");
+    if lower.contains("\\start menu\\programs\\startup") || lower.starts_with("c:\\windows\\") {
+        return Err("Enregistrement refusé : ce dossier lance des programmes ou appartient à Windows.".into());
+    }
+    Ok(())
+}
+
 /// Enregistre des octets (image PNG exportée, etc.) donnés en base64.
 #[tauri::command]
 fn save_bytes(path: String, base64: String) -> Result<(), String> {
@@ -721,6 +771,7 @@ fn save_bytes(path: String, base64: String) -> Result<(), String> {
     if path.trim().is_empty() {
         return Err("Chemin vide.".into());
     }
+    check_save_target(&path)?;
     let bytes = base64::engine::general_purpose::STANDARD.decode(base64.trim()).map_err(|e| format!("Données invalides : {e}"))?;
     std::fs::write(&path, bytes).map_err(|e| format!("Écriture impossible : {e}"))
 }
@@ -1630,6 +1681,7 @@ fn save_text(path: String, content: String) -> Result<(), String> {
     if path.trim().is_empty() {
         return Err("Chemin vide.".into());
     }
+    check_save_target(&path)?;
     std::fs::write(&path, content).map_err(|e| format!("Écriture impossible : {e}"))
 }
 
@@ -1852,6 +1904,8 @@ pub fn run() {
                 localai::kill_pid_file(&data);
             }
             std::fs::create_dir_all(app.path().app_data_dir()?)?;
+            analytics::init(&app.path().app_data_dir()?, &app.package_info().version.to_string());
+            uvrt::set_data_dir(&app.path().app_data_dir()?);
             export::set_app(app.handle().clone());
             {
                 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
@@ -1942,7 +1996,8 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler({
+            let handler: Box<dyn Fn(tauri::ipc::Invoke) -> bool + Send + Sync> = Box::new(tauri::generate_handler![
             cloud_models, cloud_test, chat_start, chat_cancel,
             agent_start, agent_inject, agent_approve, agent_undo, mcp_status, mcp_reload, mcp_config_file, mcp_edit_config,
             fs_list, term_run, read_attachment,
@@ -1954,22 +2009,47 @@ pub fn run() {
             project_docs, project_doc_add, project_doc_delete,
             chat_once, mcp_add, mcp_add_custom, mcp_import, mcp_remove,
             secret_get, secret_set, save_text, git_status, git_diff, git_commit,
-            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, analytics_get, analytics_set, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, net_online, local_models_assess, local_installed, local_set_ctx, local_status, local_install, local_cancel, local_remove, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
+            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, analytics_get, analytics_set, analytics_ui, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, net_online, local_models_assess, local_installed, local_set_ctx, local_status, local_install, local_cancel, local_remove, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
             profiles_list, profile_create, profile_update, profile_set_pin, profile_delete, profile_select,
             agents_list, agent_create, agents_import_claude, agents_open_dir,
             model_show, context_report, fs_create, fs_rename, fs_delete,
             conv_pin, conv_fork, conv_create, conv_list, conv_messages, conv_save, conv_rename, conv_delete,
             project_create, project_list, project_update, project_delete, project_pin, artifact_save, artifact_list, artifact_delete, conv_set_project
-        ])
+            ]);
+            move |invoke| {
+                if let Some(feature) = analytics::feature_of(invoke.message.command()) {
+                    track(invoke.message.webview_ref().app_handle(), "feature_used", serde_json::json!({ "feature": feature }));
+                }
+                handler(invoke)
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
             // Le navigateur et le moteur local se ferment avec l'application.
             if let tauri::RunEvent::Exit = event {
+                if let Ok(dir) = app.path().app_data_dir() {
+                    analytics::track_blocking(&dir, &app.package_info().version.to_string(), "app_closed", serde_json::json!({ "minutes": analytics::minutes_open() }));
+                }
                 browser::kill_now();
                 if let Ok(data) = app.path().app_data_dir() {
                     localai::kill_now(&data);
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod save_tests {
+    use super::check_save_target;
+
+    #[test]
+    fn saving_refuses_programs_and_startup_folders_but_keeps_documents() {
+        for bad in ["C:/x/virus.exe", "C:/x/virus.exe.", "C:/x/a.LNK", "C:/Users/a/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/x.txt", "C:/Windows/System32/x.txt"] {
+            assert!(check_save_target(bad).is_err(), "{bad}");
+        }
+        for ok in ["C:/Users/a/Documents/note.md", "C:/Users/a/Desktop/export.pdf", "C:/Users/a/Desktop/script.js", "C:/Users/a/Desktop/app.py"] {
+            assert!(check_save_target(ok).is_ok(), "{ok}");
+        }
+    }
 }
