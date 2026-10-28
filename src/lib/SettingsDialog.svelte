@@ -17,6 +17,7 @@
   import ProgressPanel from "$lib/ProgressPanel.svelte";
   import VaultPanel from "$lib/VaultPanel.svelte";
   import UpdatePanel from "$lib/UpdatePanel.svelte";
+  import AnalyticsPanel from "$lib/AnalyticsPanel.svelte";
   import HardwarePanel from "$lib/HardwarePanel.svelte";
 
   let { chat, profileName, onclose }: { chat: ChatStore; profileName: string; onclose: () => void } = $props();
@@ -30,7 +31,7 @@
     | "appearance" | "general"
     | "account" | "local" | "models" | "web" | "usage"
     | "system" | "skills" | "agents" | "connectors"
-    | "vault" | "data" | "update";
+    | "vault" | "data" | "stats" | "update";
   // Ouverture directe sur une page (la progression depuis la puce de niveau, les mises à jour depuis l'avis) : une seule fois.
   // svelte-ignore state_referenced_locally
   let tab = $state<Tab>((chat.settingsTab as Tab | null) ?? "appearance");
@@ -79,6 +80,7 @@
       items: [
         { id: "vault", label: "Coffre", icon: "lock", words: "mots de passe infos rapides adresse téléphone navigateur" },
         { id: "data", label: "Sauvegarde et effacement", icon: "download", words: "export restaurer supprimer tout effacer" },
+        { id: "stats", label: "Statistiques anonymes", icon: "gauge", words: "données confidentialité vie privée analytics envoyer aptabase télémétrie" },
       ],
     },
     { label: "À propos", items: [{ id: "update", label: "Mises à jour", icon: "download", words: "version nouveautés" }] },
@@ -104,6 +106,7 @@
     connectors: { title: "Connecteurs", intro: "Relie Lama à d'autres outils (fichiers, agenda, bases de données…) grâce aux serveurs MCP." },
     vault: { title: "Coffre", intro: "Tes mots de passe et tes infos personnelles, chiffrés sur ce PC. Lama peut les remplir pour toi sans jamais les lire." },
     data: { title: "Sauvegarde et effacement", intro: "Sauvegarder tes données, les exporter, ou tout supprimer." },
+    stats: { title: "Statistiques anonymes", intro: "Ce que Lama peut envoyer pour qu'on sache quoi améliorer, et comment le couper." },
     update: { title: "Mises à jour", intro: "La version installée et les nouveautés." },
   };
 
@@ -386,6 +389,8 @@
         <VaultPanel />
       {:else if tab === "data"}
         <DataPanel {chat} />
+      {:else if tab === "stats"}
+        <AnalyticsPanel />
       {:else if tab === "update"}
         <UpdatePanel {chat} />
       {/if}

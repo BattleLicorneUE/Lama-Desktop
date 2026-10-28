@@ -108,6 +108,7 @@ export function installMock() {
     await stream(id, "J'ai remplacé le fond gris par un dégradé sombre et vérifié le projet : tout passe.");
   }
 
+  let analyticsMock = { asked: false, enabled: false };
   let pc = { enabled: true, dirs: ["C:/Users/demo/Documents"] as string[] };
   let profiles = [
     { id: "p1", name: "Principal", color: "#c96442", legacy: true, locked: false },
@@ -321,6 +322,12 @@ export function installMock() {
         return profiles[0]?.id ?? null;
       case "window_new":
         return "win-demo";
+      case "analytics_get":
+        return { available: true, ...analyticsMock, events: [["app_started", "Lancement de l'application, avec la puissance du PC en gros (mémoire, type de carte graphique)."], ["chat_started", "Un message envoyé : cloud ou local, et le nom du modèle. Jamais le texte."], ["agent_started", "Une tâche confiée à l'agent : le mode choisi et le nom du modèle. Jamais le contenu."], ["local_model_installed", "Un modèle local installé : son nom dans le catalogue."], ["local_model_failed", "Une installation de modèle local qui a échoué : son nom dans le catalogue."], ["connector_added", "Un connecteur ajouté depuis le catalogue : son nom dans le catalogue."]],
+          sent: analyticsMock.enabled ? [{ t: Math.floor(Date.now() / 1000), name: "app_started", props: { ram_go: 24, gpu: "nvidia", vram_go: 8, avx2: true } }] : [] };
+      case "analytics_set":
+        analyticsMock = { asked: true, enabled: Boolean(args.enabled) };
+        return handler("analytics_get", {});
       case "app_settings_get":
         return { keep_background: false, autostart: false, shortcut: "Ctrl+Alt+S", shortcut_ok: true };
       case "app_settings_set":

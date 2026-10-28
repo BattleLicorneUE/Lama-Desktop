@@ -17,6 +17,7 @@
   import TasksPage from "$lib/TasksPage.svelte";
   import Celebrate from "$lib/Celebrate.svelte";
   import UpdateToast from "$lib/UpdateToast.svelte";
+  import AnalyticsAsk from "$lib/AnalyticsAsk.svelte";
   import { updater } from "$lib/updater.svelte";
   import ModelsDialog from "$lib/ModelsDialog.svelte";
   import TemplateDialog from "$lib/TemplateDialog.svelte";
@@ -222,6 +223,9 @@
 {/if}
 {#if showModels}<ModelsDialog {chat} onclose={() => (showModels = false)} />{/if}
 <Celebrate {chat} />
+{#if chat.tutorialDone && !chat.tutorialOpen && !(chat.hasModels && (!chat.onboarded || chat.onboardingOpen))}
+  <AnalyticsAsk onmore={() => { chat.settingsTab = "stats"; showSettings = true; }} />
+{/if}
 <UpdateToast onopen={() => { chat.settingsTab = "update"; showSettings = true; }} />
 {#if showSettings}<SettingsDialog {chat} profileName={profile.name} onclose={() => (showSettings = false)} />{/if}
 

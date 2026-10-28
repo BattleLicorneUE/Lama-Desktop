@@ -5,6 +5,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), ver
 ## [Non publié]
 
 ### Ajouté
+- **Statistiques anonymes, uniquement si tu acceptes** : une demande au premier lancement et une page dans les Réglages qui liste ce qui peut partir et ce qui a été envoyé. Aucun contenu de conversation, aucun identifiant conservé.
 - **Connecteur Blender** (serveur MCP officiel de Blender Lab) : lire la scène, lancer du code Python, faire des rendus et consulter la documentation. Nécessite l'extension MCP dans Blender, Git et uv.
 
 ## [0.3.0] - 2026-10-26

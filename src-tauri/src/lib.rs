@@ -17,6 +17,7 @@ mod vault;
 mod winio;
 mod reminders;
 mod schedules;
+mod analytics;
 mod appsettings;
 mod secrets;
 mod system;
@@ -169,8 +170,14 @@ async fn local_install(app: AppHandle, id: String) -> Result<(), String> {
             None => Err("Analyse du PC impossible.".to_string()),
         };
         match outcome {
-            Ok(()) => { let _ = app.emit("local:done", serde_json::json!({ "id": model.id })); }
-            Err(e) => { let _ = app.emit("local:error", serde_json::json!({ "id": model.id, "error": e })); }
+            Ok(()) => {
+                track(&app, "local_model_installed", serde_json::json!({ "model": model.id }));
+                let _ = app.emit("local:done", serde_json::json!({ "id": model.id }));
+            }
+            Err(e) => {
+                track(&app, "local_model_failed", serde_json::json!({ "model": model.id }));
+                let _ = app.emit("local:error", serde_json::json!({ "id": model.id, "error": e }));
+            }
         }
     });
     Ok(())
@@ -225,6 +232,7 @@ async fn chat_start(
     options: Option<serde_json::Value>,
     cloud_key: String,
 ) -> Result<(), String> {
+    track(&app, "chat_started", serde_json::json!({ "kind": if model.starts_with("local:") { "local" } else { "cloud" }, "model": model }));
     let running = state.running.clone();
     let rid = request_id.clone();
     let handle = tokio::spawn(async move {
@@ -287,6 +295,7 @@ async fn agent_start(
     docs: Option<Vec<AttachmentIn>>,
     project_id: Option<String>,
 ) -> Result<(), String> {
+    track(&app, "agent_started", serde_json::json!({ "mode": mode, "model": model }));
     let attachments: Vec<(String, String)> = attachments.unwrap_or_default().into_iter().map(|a| (a.name, a.content)).collect();
     let docs: Vec<(String, String)> = docs.unwrap_or_default().into_iter().map(|a| (a.name, a.content)).collect();
     let project_id = project_id.filter(|p| !p.trim().is_empty());
@@ -347,6 +356,49 @@ async fn agent_inject(window: tauri::Window, state: State<'_, AppState>, request
     }
     state.agent_of(window.label()).inbox.lock_safe().entry(request_id).or_default().push(text.trim().to_string());
     Ok(true)
+}
+
+/// Statistiques anonymes : sans « oui » de l'utilisateur, cette fonction ne fait rien.
+fn track(app: &AppHandle, name: &'static str, props: serde_json::Value) {
+    if let Ok(dir) = app_root(app) {
+        analytics::track(&dir, &app.package_info().version.to_string(), name, props);
+    }
+}
+
+#[tauri::command]
+fn analytics_get(app: AppHandle) -> Result<analytics::Info, String> {
+    Ok(analytics::info(&app_root(&app)?))
+}
+
+#[tauri::command]
+fn analytics_set(app: AppHandle, enabled: bool) -> Result<analytics::Info, String> {
+    let dir = app_root(&app)?;
+    analytics::set_consent(&dir, enabled)?;
+    if enabled {
+        send_started(&app);
+    }
+    Ok(analytics::info(&dir))
+}
+
+/// Lancement : la puissance du PC en gros (tranches), jamais le nom exact des composants.
+fn send_started(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let hw = hardware::cached().await;
+        let gpu = hw.best_gpu();
+        let vendor = gpu.map_or("aucune", |g| match g.vendor {
+            hardware::Vendor::Nvidia => "nvidia",
+            hardware::Vendor::Amd => "amd",
+            hardware::Vendor::Intel => "intel",
+            hardware::Vendor::Other => "autre",
+        });
+        track(&app, "app_started", serde_json::json!({
+            "ram_go": (hw.ram_mb as f64 / 4096.0).round() as u64 * 4,
+            "gpu": vendor,
+            "vram_go": gpu.map_or(0, |g| (g.vram_mb as f64 / 2048.0).round() as u64 * 2),
+            "avx2": hw.avx2,
+        }));
+    });
 }
 
 fn app_root(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -1368,11 +1420,13 @@ fn connector_add(app: AppHandle, id: String, values: HashMap<String, String>) ->
     for (name, value) in &secrets_to_store {
         secrets::set(&profile, name, value)?;
     }
-    let path = mcp_config_file(app)?;
+    let path = mcp_config_file(app.clone())?;
     let mut cfg: serde_json::Value = std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_else(|| serde_json::json!({}));
     let servers = cfg.as_object_mut().ok_or("mcp.json invalide")?.entry("mcpServers").or_insert_with(|| serde_json::json!({}));
     servers[&id] = entry;
-    std::fs::write(&path, serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+    std::fs::write(&path, serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    track(&app, "connector_added", serde_json::json!({ "connector": id }));
+    Ok(())
 }
 
 /// Réécrit `mcp.json` après modification de la liste des serveurs.
@@ -1837,6 +1891,7 @@ pub fn run() {
                     let _ = w.hide();
                 }
             }
+            send_started(app.handle());
             // Base vide jusqu'au choix d'un profil (`profile_select` la remplace par celle du profil).
             app.manage(std::sync::Mutex::new(History::in_memory()?));
             // Rappels : vérifiés toutes les 10 s, tant que l'application tourne.
@@ -1899,7 +1954,7 @@ pub fn run() {
             project_docs, project_doc_add, project_doc_delete,
             chat_once, mcp_add, mcp_add_custom, mcp_import, mcp_remove,
             secret_get, secret_set, save_text, git_status, git_diff, git_commit,
-            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, net_online, local_models_assess, local_installed, local_set_ctx, local_status, local_install, local_cancel, local_remove, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
+            journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, analytics_get, analytics_set, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, net_online, local_models_assess, local_installed, local_set_ctx, local_status, local_install, local_cancel, local_remove, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
             profiles_list, profile_create, profile_update, profile_set_pin, profile_delete, profile_select,
             agents_list, agent_create, agents_import_claude, agents_open_dir,
             model_show, context_report, fs_create, fs_rename, fs_delete,
