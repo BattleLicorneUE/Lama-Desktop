@@ -61,7 +61,7 @@
   .medal { position: relative; flex: none; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(160deg, #de7650, #b4502e); color: #fff; animation: medal 0.7s 0.15s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
   .level .medal { width: 58px; height: 58px; animation: medal 0.8s 0.15s cubic-bezier(0.3, 1.6, 0.5, 1) both, glow 1.6s 0.9s ease-in-out 2; }
   .txt { display: grid; gap: 1px; min-width: 0; }
-  .txt small { color: var(--accent); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .txt small { color: var(--accent); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
   .txt b { font-size: 16px; font-weight: 600; }
   .txt span { color: var(--muted); font-size: 13.5px; line-height: 1.4; }
   .burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }

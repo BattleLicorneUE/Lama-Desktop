@@ -497,7 +497,7 @@
   .meter span { display: block; height: 100%; border-radius: 3px; transition: width 0.3s, background 0.3s; background: var(--del); }
   .meter[data-level="2"] span { background: #d9a13a; }
   .meter[data-level="3"] span, .meter[data-level="4"] span { background: var(--add); }
-  .meter small { position: absolute; right: 0; top: 9px; color: var(--muted); font-size: 11.5px; }
+  .meter small { position: absolute; right: 0; top: 9px; color: var(--muted); font-size: 12px; }
   .gen { display: grid; gap: 8px; border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px; }
   .range input { width: 100%; accent-color: var(--accent); }
   .checks { display: flex; flex-wrap: wrap; gap: 6px 16px; }

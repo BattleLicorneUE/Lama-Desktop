@@ -105,7 +105,7 @@
   .head button { border: 0; background: none; color: var(--muted); padding: 5px 8px; border-radius: 8px; font-size: 14px; }
   .head button.on { background: var(--hover); color: var(--fg); }
   .sp { flex: 1; }
-  .badge { background: var(--accent); color: var(--accent-fg); border-radius: 9px; padding: 0 6px; font-size: 11px; font-weight: 700; }
+  .badge { background: var(--accent); color: var(--accent-fg); border-radius: 9px; padding: 0 6px; font-size: 12px; font-weight: 700; }
   .undo { display: inline-flex; align-items: center; gap: 5px; }
   .undo:hover { color: var(--accent); }
   .msg { color: var(--muted); font-size: 13px; padding: 10px 12px; margin: 0; }

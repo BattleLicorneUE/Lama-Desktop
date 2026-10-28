@@ -268,7 +268,7 @@
   .empty { color: var(--muted); }
   .bglist li { align-items: flex-start; }
   .cmd { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; background: var(--code); padding: 1px 6px; border-radius: 5px; }
-  .tail { margin: 4px 0 0; font-size: 11.5px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 70px; overflow: hidden; font-family: ui-monospace, Consolas, monospace; }
+  .tail { margin: 4px 0 0; font-size: 12px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 70px; overflow: hidden; font-family: ui-monospace, Consolas, monospace; }
   .mini { border: 1px solid var(--border); background: var(--surface); border-radius: 7px; padding: 2px 8px; font-size: 12px; flex: none; }
   .mini:hover { border-color: var(--accent); }
   .mini.wide { margin-top: 6px; }
@@ -279,7 +279,7 @@
   .chgrow { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 0; text-align: left; font-size: 13px; color: var(--fg); }
   .chgrow:disabled { cursor: default; }
   .chgrow .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .diff { margin: 4px 0 2px; max-height: 220px; overflow: auto; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; line-height: 1.45; background: var(--code); border-radius: 8px; padding: 6px 0; }
+  .diff { margin: 4px 0 2px; max-height: 220px; overflow: auto; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.45; background: var(--code); border-radius: 8px; padding: 6px 0; }
   .diff span { display: block; padding: 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .diff .add { background: var(--add-bg); color: var(--add); }
   .diff .del { background: var(--del-bg); color: var(--del); }

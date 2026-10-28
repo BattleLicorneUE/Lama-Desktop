@@ -7,7 +7,16 @@
   });
 </script>
 
-<svelte:window onkeydown={(e) => confirmState.current && e.key === "Escape" && answerConfirm(false)} />
+<!-- Échap répond « non » à la confirmation et s'arrête là : les fenêtres ouvertes derrière (Réglages, éditeurs) restent ouvertes. -->
+<svelte:window
+  onkeydowncapture={(e) => {
+    if (confirmState.current && e.key === "Escape") {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      answerConfirm(false);
+    }
+  }}
+/>
 
 {#if confirmState.current}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->

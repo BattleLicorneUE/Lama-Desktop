@@ -317,7 +317,7 @@
   .ctxbox { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
   .ctx { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); max-width: 360px; }
   .ctx select { border: 1px solid var(--border); background: var(--surface); color: var(--fg); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 13px; }
-  .tag { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--code); }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--code); }
   .tag.soft { color: var(--muted); }
   .tag.no { opacity: 0.7; text-decoration: line-through; text-decoration-thickness: 1px; }
   .tag.fast { color: var(--add); border-color: color-mix(in srgb, var(--add) 50%, var(--border)); }
@@ -342,7 +342,7 @@
   .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-top: 6px; }
   .tabs button { border: none; background: none; border-radius: 8px 8px 0 0; padding: 7px 14px; color: var(--muted); border-bottom: 2px solid transparent; font-size: 14px; }
   .tabs button.on { color: var(--fg); border-bottom-color: var(--fg); font-weight: 600; }
-  .count { font-size: 11.5px; color: var(--muted); font-weight: 400; margin-left: 2px; }
+  .count { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 2px; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .fchip { border-radius: 999px; padding: 3px 12px; font-size: 12.5px; }
   .fchip.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }

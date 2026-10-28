@@ -278,7 +278,7 @@
   li { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
   li:last-child { border-bottom: 0; }
   .rank { width: 28px; color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
-  .badge { font-size: 11px; background: var(--hover); color: var(--muted); border-radius: 5px; padding: 0 6px; margin-left: 6px; }
+  .badge { font-size: 12px; background: var(--hover); color: var(--muted); border-radius: 5px; padding: 0 6px; margin-left: 6px; }
   .sw input { accent-color: var(--accent); }
   .confirm { max-width: 480px; display: flex; flex-direction: column; gap: 12px; }
   .confirm .scroll { max-height: 280px; }

@@ -83,7 +83,7 @@
   .bar span { display: block; width: 100%; min-height: 0; }
   .bar .i { background: var(--accent); border-radius: 4px 4px 0 0; order: 1; }
   .bar .o { background: color-mix(in srgb, var(--accent) 40%, var(--bg)); order: 2; }
-  .col small { color: var(--muted); font-size: 11px; }
+  .col small { color: var(--muted); font-size: 12px; }
   .legend { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; margin: 0; }
   .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
   .sw.i { background: var(--accent); }

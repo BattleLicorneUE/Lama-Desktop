@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::skills::{field_of, split_front};
 
@@ -191,29 +191,131 @@ pub fn effective_mode(user: &str, profile: Option<&AgentProfile>) -> String {
     }
 }
 
-/// Crée un agent (fichier `.md`) ; ne remplace jamais un fichier existant.
-pub fn create(dir: &Path, name: &str, description: &str, prompt: &str, read_only: bool) -> Result<PathBuf, String> {
-    let slug: String = name
-        .trim()
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .trim_matches('-')
-        .to_string();
-    if slug.is_empty() {
-        return Err("Nom d'agent invalide".into());
+/// Ce que l'utilisateur écrit dans l'éditeur d'agent.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct Draft {
+    pub name: String,
+    pub description: String,
+    pub prompt: String,
+    /// Modèle imposé ; vide = celui de la conversation.
+    #[serde(default)]
+    pub model: String,
+    /// Outils autorisés ; `None` = tous.
+    #[serde(default)]
+    pub tools: Option<Vec<String>>,
+}
+
+const MAX_NAME: usize = 48;
+const MAX_DESCRIPTION: usize = 500;
+const MAX_PROMPT: usize = 20_000;
+const RESERVED: &[&str] = &["con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"];
+
+fn one_line(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Nom de fichier et d'agent : minuscules, chiffres et tirets.
+pub fn slugify(name: &str) -> String {
+    let mut out = String::new();
+    for c in name.trim().to_lowercase().chars() {
+        let c = if c.is_alphanumeric() { c } else { '-' };
+        if c == '-' && (out.is_empty() || out.ends_with('-')) {
+            continue;
+        }
+        out.push(c);
     }
+    out.trim_matches('-').to_string()
+}
+
+pub fn validate(d: &Draft) -> Result<String, String> {
+    let slug = slugify(&d.name);
+    if slug.is_empty() {
+        return Err("Donne un nom à l'agent (lettres, chiffres et tirets).".into());
+    }
+    if slug.chars().count() > MAX_NAME {
+        return Err(format!("Le nom est trop long ({MAX_NAME} caractères au plus)."));
+    }
+    if RESERVED.contains(&slug.as_str()) {
+        return Err(format!("« {slug} » est un nom réservé par Windows : choisis-en un autre."));
+    }
+    let desc = one_line(&d.description);
+    if desc.chars().count() < 8 {
+        return Err("Explique en une phrase quand confier une tâche à cet agent : c'est ce qui permet à Lama de le choisir.".into());
+    }
+    if desc.chars().count() > MAX_DESCRIPTION {
+        return Err(format!("La description est trop longue ({MAX_DESCRIPTION} caractères au plus)."));
+    }
+    let prompt = d.prompt.trim();
+    if prompt.chars().count() < 10 {
+        return Err("Écris la consigne de l'agent : son rôle et sa méthode.".into());
+    }
+    if prompt.len() > MAX_PROMPT {
+        return Err(format!("La consigne est trop longue ({} Ko au plus).", MAX_PROMPT / 1000));
+    }
+    if d.model.trim().chars().any(|c| c.is_control() || c == '\n') || d.model.len() > 120 {
+        return Err("Nom de modèle invalide.".into());
+    }
+    if let Some(tools) = &d.tools {
+        if tools.len() > 60 || tools.iter().any(|t| t.is_empty() || t.len() > 60 || !t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')) {
+            return Err("Liste d'outils invalide.".into());
+        }
+    }
+    Ok(slug)
+}
+
+/// Contenu du fichier `.md` de l'agent.
+pub fn render(d: &Draft, slug: &str) -> String {
+    let mut s = format!("---\nname: {slug}\ndescription: >-\n  {}\n", one_line(&d.description));
+    let model = d.model.trim();
+    if !model.is_empty() {
+        s.push_str(&format!("model: {model}\n"));
+    }
+    if let Some(tools) = &d.tools {
+        s.push_str(&format!("tools: {}\n", tools.join(", ")));
+    }
+    s.push_str(&format!("---\n{}\n", d.prompt.replace("\r\n", "\n").trim()));
+    s
+}
+
+pub fn draft_of(p: &AgentProfile) -> Draft {
+    Draft { name: p.name.clone(), description: p.description.clone(), prompt: p.prompt.clone(), model: p.model.clone().unwrap_or_default(), tools: p.tools.clone() }
+}
+
+fn same_file(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => false,
+    }
+}
+
+/// Enregistre un agent dans `dir`. `original` : le fichier de l'agent modifié (renommé si le nom change).
+pub fn save(dir: &Path, d: &Draft, original: Option<&Path>) -> Result<PathBuf, String> {
+    let slug = validate(d)?;
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let path = dir.join(format!("{slug}.md"));
-    if path.exists() {
-        return Err(format!("L'agent « {slug} » existe déjà."));
+    if path.exists() && !original.is_some_and(|o| same_file(o, &path)) {
+        return Err(format!("Un agent « {slug} » existe déjà : choisis un autre nom, ou modifie celui-là."));
     }
-    let tools = if read_only { "tools: read_file, list_dir, grep\n" } else { "" };
-    let desc = description.trim().replace('\n', " ");
-    let body = if prompt.trim().is_empty() { "Décris ici le rôle et la méthode de cet agent." } else { prompt.trim() };
-    std::fs::write(&path, format!("---\nname: {slug}\ndescription: {desc}\n{tools}---\n{body}\n")).map_err(|e| e.to_string())?;
+    if let Some(o) = original {
+        if !same_file(o, &path) {
+            if o.parent().map(|p| same_file(p, dir)) != Some(true) {
+                return Err("Cet agent ne peut pas être renommé d'ici.".into());
+            }
+            let _ = std::fs::remove_file(o);
+        }
+    }
+    let tmp = dir.join(format!("{slug}.md.tmp"));
+    std::fs::write(&tmp, render(d, &slug)).map_err(|e| format!("Écriture impossible : {e}"))?;
+    std::fs::rename(&tmp, &path).map_err(|e| format!("Écriture impossible : {e}"))?;
     Ok(path)
+}
+
+/// Supprime un agent : seulement un fichier `.md` placé directement dans `dir`.
+pub fn delete(dir: &Path, file: &Path) -> Result<(), String> {
+    if file.parent().map(|p| same_file(p, dir)) != Some(true) || file.extension().is_none_or(|x| x != "md") {
+        return Err("Ce fichier n'est pas un agent de la liste.".into());
+    }
+    std::fs::remove_file(file).map_err(|e| format!("Suppression impossible : {e}"))
 }
 
 /// Copie les agents de Claude Code (`~/.claude/agents/*.md`) absents de `dest`. Renvoie le nombre copié.
@@ -321,16 +423,74 @@ corps", "x", "app", None);
         assert_eq!(effective_mode("auto", None), "auto");
     }
 
-    #[test]
-    fn create_never_overwrites_and_import_skips_existing() {
-        let d = tmp();
-        let p = create(&d, "Mon Agent!", "fait des choses", "Sois bref.", true).unwrap();
-        assert!(p.ends_with("mon-agent.md"));
-        let parsed = parse(&std::fs::read_to_string(&p).unwrap(), "x", "app", None);
-        assert_eq!(parsed.tools.unwrap(), ["read_file", "list_dir", "grep"]);
-        assert!(create(&d, "mon agent", "", "", false).is_err());
-        assert!(create(&d, "***", "", "", false).is_err());
+    fn draft() -> Draft {
+        Draft {
+            name: "Relecteur sécurité".into(),
+            description: "Utilise-le quand on veut une relecture : failles, secrets oubliés, entrées non vérifiées.".into(),
+            prompt: "Tu relis le code à la recherche de failles. Réponds par une liste classée par gravité.".into(),
+            model: String::new(),
+            tools: Some(vec!["read_file".into(), "list_dir".into(), "grep".into()]),
+        }
+    }
 
+    #[test]
+    fn a_saved_agent_is_read_back_by_the_scanner() {
+        let d = tmp();
+        let path = save(&d, &draft(), None).unwrap();
+        assert!(path.ends_with("relecteur-sécurité.md"));
+        let all = scan(&d, None);
+        let a = find(&all, "relecteur-sécurité").unwrap();
+        assert_eq!(a.description, draft().description);
+        assert_eq!(a.prompt, draft().prompt);
+        assert_eq!(a.tools.as_deref().unwrap(), ["read_file", "list_dir", "grep"]);
+        assert!(a.model.is_none());
+        assert_eq!(draft_of(a).tools, draft().tools);
+        let with_model = Draft { model: "gpt-oss:120b".into(), tools: None, ..draft() };
+        save(&d, &with_model, Some(&path)).unwrap();
+        let again = scan(&d, None);
+        let a = find(&again, "relecteur-sécurité").unwrap();
+        assert_eq!(a.model.as_deref(), Some("gpt-oss:120b"));
+        assert!(a.tools.is_none());
+    }
+
+    #[test]
+    fn saving_never_overwrites_another_agent_and_renaming_moves_the_file() {
+        let d = tmp();
+        let path = save(&d, &draft(), None).unwrap();
+        assert!(save(&d, &draft(), None).unwrap_err().contains("existe déjà"));
+        let other = save(&d, &Draft { name: "Autre".into(), ..draft() }, None).unwrap();
+        assert!(save(&d, &Draft { name: "relecteur sécurité".into(), ..draft() }, Some(&other)).unwrap_err().contains("existe déjà"));
+        assert!(other.exists() && path.exists());
+        let renamed = save(&d, &Draft { name: "Relecture".into(), ..draft() }, Some(&path)).unwrap();
+        assert!(renamed.exists() && !path.exists());
+    }
+
+    #[test]
+    fn incomplete_agents_are_refused_and_only_listed_files_are_deleted() {
+        for (bad, hint) in [
+            (Draft { name: "".into(), ..draft() }, "nom"),
+            (Draft { name: "nul".into(), ..draft() }, "réservé"),
+            (Draft { description: "court".into(), ..draft() }, "quand confier"),
+            (Draft { prompt: " ".into(), ..draft() }, "consigne"),
+            (Draft { tools: Some(vec!["rm -rf".into()]), ..draft() }, "outils"),
+        ] {
+            let e = validate(&bad).unwrap_err();
+            assert!(e.to_lowercase().contains(hint), "{e} doit contenir « {hint} »");
+        }
+        let d = tmp();
+        let path = save(&d, &draft(), None).unwrap();
+        let outside = tmp().join("x.md");
+        std::fs::write(&outside, "x").unwrap();
+        assert!(delete(&d, &outside).is_err() && outside.exists());
+        assert!(delete(&d, &d.join("notes.txt")).is_err());
+        delete(&d, &path).unwrap();
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn import_skips_existing_agents() {
+        let d = tmp();
+        std::fs::write(d.join("mon-agent.md"), "x").unwrap();
         let src = tmp();
         std::fs::write(src.join("a.md"), "x").unwrap();
         std::fs::write(src.join("mon-agent.md"), "y").unwrap();

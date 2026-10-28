@@ -1195,9 +1195,57 @@ fn agents_list(app: AppHandle, workspace: Option<String>) -> Result<Vec<agents::
     Ok(agents::scan(&agents_dir(&app)?, ws.as_deref()))
 }
 
+/// Un agent ouvert dans l'éditeur : son contenu et sa portée.
+#[derive(serde::Serialize)]
+struct AgentEdit {
+    draft: agents::Draft,
+    scope: String,
+}
+
+fn find_agent(app: &AppHandle, workspace: Option<String>, name: &str) -> Result<agents::AgentProfile, String> {
+    let ws = workspace.filter(|w| !w.trim().is_empty()).map(std::path::PathBuf::from);
+    let all = agents::scan(&agents_dir(app)?, ws.as_deref());
+    agents::find(&all, name).cloned().ok_or_else(|| "Agent introuvable.".to_string())
+}
+
+/// Contenu d'un agent pour l'éditeur (les agents intégrés peuvent être copiés, pas modifiés sur place).
 #[tauri::command]
-fn agent_create(app: AppHandle, name: String, description: String, prompt: String, read_only: bool) -> Result<String, String> {
-    agents::create(&agents_dir(&app)?, &name, &description, &prompt, read_only).map(|p| p.to_string_lossy().into_owned())
+fn agent_get(app: AppHandle, workspace: Option<String>, name: String) -> Result<AgentEdit, String> {
+    let a = find_agent(&app, workspace, &name)?;
+    Ok(AgentEdit { draft: agents::draft_of(&a), scope: a.scope })
+}
+
+/// Crée ou modifie un agent (`original` : le nom de l'agent modifié). `scope` : « app » ou « project » (`.agents/` du dossier de travail).
+#[tauri::command]
+fn agent_save(app: AppHandle, workspace: Option<String>, draft: agents::Draft, scope: String, original: Option<String>) -> Result<String, String> {
+    let existing = match original.as_deref().filter(|n| !n.trim().is_empty()) {
+        Some(n) => {
+            let a = find_agent(&app, workspace.clone(), n)?;
+            if a.file.is_none() {
+                return Err("Un agent intégré ne se modifie pas : enregistre-le sous un autre nom pour en faire ta version.".into());
+            }
+            Some(a)
+        }
+        None => None,
+    };
+    let dir = match &existing {
+        Some(a) => a.file.as_ref().and_then(|f| f.parent()).map(std::path::Path::to_path_buf).ok_or("Dossier de l'agent introuvable.")?,
+        None if scope == "project" => {
+            let ws = workspace.filter(|w| !w.trim().is_empty()).ok_or("Ouvre d'abord un dossier de travail pour créer un agent de projet.")?;
+            std::path::PathBuf::from(ws).join(".agents")
+        }
+        None => agents_dir(&app)?,
+    };
+    agents::save(&dir, &draft, existing.as_ref().and_then(|a| a.file.as_deref())).map(|p| p.to_string_lossy().into_owned())
+}
+
+/// Supprime un agent (jamais un agent intégré).
+#[tauri::command]
+fn agent_delete(app: AppHandle, workspace: Option<String>, name: String) -> Result<(), String> {
+    let a = find_agent(&app, workspace, &name)?;
+    let file = a.file.ok_or("Un agent intégré ne se supprime pas.")?;
+    let dir = file.parent().map(std::path::Path::to_path_buf).ok_or("Dossier de l'agent introuvable.")?;
+    agents::delete(&dir, &file)
 }
 
 /// Copie les agents de Claude Code (`~/.claude/agents`) dans l'application. Renvoie le nombre importé.
@@ -2043,7 +2091,7 @@ pub fn run() {
             secret_get, secret_set, save_text, git_status, git_diff, git_commit,
             journal_list, journal_clear, last_shot, app_settings_get, app_settings_set, analytics_get, analytics_set, analytics_ui, connectors_catalog, connectors_installed, connector_add, connector_remove, profile_active, window_new, window_task, board_report, board_list, board_focus, pc_get, pc_set, hardware_detect, net_online, local_models_assess, local_installed, local_set_ctx, local_status, local_install, local_cancel, local_remove, local_clean_partials, save_bytes, reveal_file, agent_changes, git_branch_create, git_review_diff, project_templates, project_from_template, project_rules_get, project_rules_set, export_document, export_html_pdf, voice_dictation, reminders_list, reminders_cancel, bg_list, bg_stop, bg_clear,
             profiles_list, profile_create, profile_update, profile_set_pin, profile_delete, profile_select,
-            agents_list, agent_create, agents_import_claude, agents_open_dir,
+            agents_list, agent_get, agent_save, agent_delete, agents_import_claude, agents_open_dir,
             model_show, context_report, fs_create, fs_rename, fs_delete,
             conv_pin, conv_fork, conv_create, conv_list, conv_messages, conv_save, conv_rename, conv_delete,
             project_create, project_list, project_update, project_delete, project_pin, artifact_save, artifact_list, artifact_delete, conv_set_project

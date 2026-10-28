@@ -149,7 +149,7 @@
             <label>
               <span>{custom.http ? "Adresse du serveur" : "Commande complète"}</span>
               <input bind:value={custom.target} placeholder={custom.http ? "http://127.0.0.1:8000/mcp" : "npx -y @scope/serveur-mcp --option"} autocomplete="off" spellcheck="false" />
-              <small class="muted">{custom.http ? "Le serveur doit déjà être démarré." : "Mets les chemins avec des espaces entre guillemets. npx et uvx demandent Node.js ou uv."}</small>
+              <small class="muted">{custom.http ? "Le serveur doit déjà être démarré." : "Mets les chemins avec des espaces entre guillemets. uvx est téléchargé tout seul par Lama si besoin ; npx demande Node.js."}</small>
             </label>
             <label>
               <span>{custom.http ? "En-têtes (facultatif)" : "Variables d'environnement (facultatif)"}</span>
@@ -178,7 +178,7 @@
 <section>
   <h3>Catalogue de connecteurs</h3>
   <p class="muted">Choisis un service, remplis quelques champs et c'est fait. Les jetons vont dans le coffre Windows, jamais dans le fichier de configuration.
-    Après l'ajout, Lama démarre le connecteur et affiche le nombre d'outils reçus, ou l'erreur. Ce sont des programmes tiers lancés sur ton PC avec <code>npx</code> ou <code>uvx</code> : il faut avoir Node.js ou uv installé.
+    Après l'ajout, Lama démarre le connecteur et affiche le nombre d'outils reçus, ou l'erreur. Ce sont des programmes tiers lancés sur ton PC avec <code>npx</code> (il faut Node.js) ou <code>uvx</code> (Lama télécharge <code>uv</code> tout seul au premier besoin).
     Je n'ai pas pu tous les essayer avec un vrai compte.</p>
   {#each categories as cat}
     <h4>{cat}</h4>

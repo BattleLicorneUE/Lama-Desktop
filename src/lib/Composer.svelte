@@ -250,7 +250,7 @@
 <style>
   .wrap { position: relative; }
   .caps { display: inline-flex; gap: 4px; min-width: 0; overflow: hidden; }
-  .cap { font-size: 11.5px; color: var(--muted); background: var(--hover); border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
+  .cap { font-size: 12px; color: var(--muted); background: var(--hover); border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
   .composer { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 12px 14px 10px; box-shadow: 0 2px 10px rgb(0 0 0 / 0.05); }
   .composer:focus-within { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
   textarea { width: 100%; border: 0; outline: none; resize: none; background: none; max-height: 220px; line-height: 1.5; font-size: 16px; }
@@ -278,7 +278,7 @@
   .slash { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; z-index: 20; list-style: none; margin: 0; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.15); max-height: 260px; overflow-y: auto; }
   .slash button { display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 9px; }
   .slash button.on, .slash button:hover { background: var(--hover); }
-  .tag { font-size: 11px; background: var(--hover); color: var(--muted); border-radius: 5px; padding: 0 6px; }
+  .tag { font-size: 12px; background: var(--hover); color: var(--muted); border-radius: 5px; padding: 0 6px; }
   .hint { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .notice { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg); border-radius: 999px; padding: 5px 14px; font-size: 13px; }
 </style>

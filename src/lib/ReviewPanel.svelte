@@ -83,12 +83,12 @@
   ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   li { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
   .row { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 7px 10px; text-align: left; font-size: 13px; color: var(--fg); }
-  .tag { flex: none; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--hover); }
+  .tag { flex: none; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--hover); }
   li.bug .tag { background: color-mix(in srgb, var(--del) 20%, transparent); color: var(--del); }
   li.risque .tag { background: color-mix(in srgb, #d98b1f 22%, transparent); color: #b8740f; }
   li.style .tag, li.suggestion .tag { color: var(--muted); }
   .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .loc { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--muted); background: var(--code); border-radius: 5px; padding: 1px 5px; }
+  .loc { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); background: var(--code); border-radius: 5px; padding: 1px 5px; }
   .body { border-top: 1px solid var(--border); padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; }
   .body p { margin: 0; }
   .fix { color: var(--muted); }

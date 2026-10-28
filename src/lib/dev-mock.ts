@@ -11,6 +11,11 @@ export function installMock() {
 
   const callbacks = new Map<number, (e: unknown) => void>();
   let localInstalled: { id: string; name: string; size_bytes: number; tools: boolean; vision: boolean; license: string; ctx: number; ctx_setting: number; auto_ctx: number; max_ctx: number; options: { ctx: number; mem_mb: number }[] }[] = [];
+  let agentsMock: { name: string; description: string; prompt: string; model: string | null; tools: string[] | null; permission: string | null; skills: string[] | null; scope: string }[] = [
+    { name: "explorateur", description: "Explore le code en lecture seule et résume.", prompt: "", model: null, tools: ["read_file", "list_dir", "grep"], permission: null, skills: null, scope: "builtin" },
+    { name: "relecteur", description: "Relit du code : bugs, cas limites, sécurité.", prompt: "", model: null, tools: ["read_file", "list_dir", "grep"], permission: null, skills: null, scope: "builtin" },
+    { name: "debogueur", description: "Trouve la cause racine d'un bug et corrige.", prompt: "", model: null, tools: null, permission: null, skills: null, scope: "builtin" },
+  ];
   let localCancelled = false;
   let localPartial = 734003200;
   const listeners = new Map<string, number[]>();
@@ -488,15 +493,26 @@ export function installMock() {
         if (p?.locked && args.pin !== "1234") throw "Code PIN incorrect.";
         return null;
       }
+      case "agent_get": {
+        const a = agentsMock.find((x) => x.name === args.name);
+        if (!a) throw "Agent introuvable.";
+        return { draft: { name: a.name, description: a.description, prompt: a.prompt || "Tu es un agent de démonstration. Réponds par une liste courte.", model: a.model ?? "", tools: a.tools }, scope: a.scope };
+      }
+      case "agent_save": {
+        const d = args.draft as { name: string; description: string; prompt: string; model: string; tools: string[] | null };
+        const slug = d.name.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
+        if (agentsMock.some((x) => x.name === slug && x.name !== args.original)) throw `Un agent « ${slug} » existe déjà : choisis un autre nom, ou modifie celui-là.`;
+        const entry = { name: slug, description: d.description, prompt: d.prompt, model: d.model || null, tools: d.tools, permission: null, skills: null, scope: String(args.scope) };
+        agentsMock = args.original ? agentsMock.map((x) => (x.name === args.original ? entry : x)) : [...agentsMock, entry];
+        return "C:/agents/" + slug + ".md";
+      }
+      case "agent_delete":
+        agentsMock = agentsMock.filter((x) => x.name !== args.name);
+        return null;
       case "agents_list":
-        return [
-          { name: "explorateur", description: "Explore le code en lecture seule et résume.", prompt: "", model: null, tools: ["read_file", "list_dir", "grep"], permission: null, skills: null, scope: "builtin" },
-          { name: "relecteur", description: "Relit du code : bugs, cas limites, sécurité.", prompt: "", model: null, tools: ["read_file", "list_dir", "grep"], permission: null, skills: null, scope: "builtin" },
-          { name: "debogueur", description: "Trouve la cause racine d'un bug et corrige.", prompt: "", model: null, tools: null, permission: null, skills: null, scope: "builtin" },
-        ];
+        return agentsMock;
       case "agents_import_claude":
         return 2;
-      case "agent_create":
       case "agents_open_dir":
         return null;
       case "context_report":

@@ -8,8 +8,13 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), ver
 - **Éditeur de skills** : « Nouveau skill » ouvre un vrai éditeur (nom, quand l'utiliser, instructions) au lieu d'un fichier à compléter dans le Bloc-notes. On peut partir d'un modèle (relire, résumer, message de commit, expliquer du code) ou décrire son idée en une phrase et laisser Lama rédiger le skill.
 - **Modifier et supprimer un skill** depuis la liste ; renommer un skill garde ses fichiers annexes.
 - Un skill peut être réservé à la commande `/nom` (Lama ne le choisit pas seul) et rangé pour un seul projet.
+- **Éditeur d'agents**, sur le même modèle : modèles de départ, rédaction par Lama à partir d'une idée, choix de ce que l'agent peut faire (tout, lecture seule, lecture et web), modèle imposé facultatif, modification et suppression. Les agents intégrés se copient pour en faire sa propre version.
 
 ### Modifié
+- **Couleur d'accent assombrie** (contraste de 4,9 avec du blanc au lieu de 3,9) et version plus claire en thème sombre, avec texte foncé : boutons et liens lisibles.
+- Les petites étiquettes (10 à 11,5 px) passent à 12 px.
+- **Échap** : dans une confirmation, la touche ne ferme plus que la confirmation, pas la fenêtre ouverte derrière.
+- Les textes des connecteurs précisent que `uv` est téléchargé par Lama ; seul Node.js reste à installer pour `npx`.
 - **Modèles locaux, page refaite** : deux onglets (Installés, À installer), filtres par usage, espace disque utilisé et libre, réglage de la taille de conversation replié par défaut.
 - **Plusieurs installations à la suite** : un modèle peut être mis en file pendant qu'un autre se télécharge ; vitesse et temps restant affichés, file modifiable, annulation d'un seul modèle ou de tout.
 - **Suppression plus claire** : la confirmation indique l'espace libéré, le résultat s'affiche, et Lama bascule sur un autre modèle si on supprime celui qui était choisi.

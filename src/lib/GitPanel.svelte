@@ -157,7 +157,7 @@
   .files li button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 4px 10px; text-align: left; font-size: 13px; }
   .files li:hover button, .files li.on button { background: var(--hover); }
   .path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chip { flex: none; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; font-size: 11px; font-weight: 700; background: var(--hover); color: var(--muted); }
+  .chip { flex: none; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; font-size: 12px; font-weight: 700; background: var(--hover); color: var(--muted); }
   .chip.sM { color: var(--info); }
   .chip.sA, .chip.su { color: var(--add); }
   .chip.sD { color: var(--del); }
