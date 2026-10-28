@@ -92,6 +92,11 @@ pub fn catalog() -> Vec<Connector> {
             &["--from", "mcpforunityserver", "mcp-for-unity", "--transport", "stdio"], &[], &[],
             "1. Dans Unity (2021.3 ou plus récent) : Window, Package Manager, « + », « Add package from git URL », colle https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main\n2. Garde l'éditeur ouvert : le plugin se connecte tout seul au serveur (vérifie l'état dans Window, MCP for Unity).\n3. Ajoute ce connecteur ici.", "https://github.com/CoplayDev/unity-mcp",
         ),
+        c(
+            "blender", "Blender", "Piloter Blender : lire la scène, lancer du code Python (bpy), faire des rendus et consulter la documentation officielle. Prévois un bon modèle : il écrit du code Python pour agir.", "Création 3D", "uv", "uvx",
+            &["--from", "git+https://projects.blender.org/lab/blender_mcp.git#subdirectory=mcp", "blender-mcp"], &[], &[],
+            "1. Il faut Git et uv installés sur ce PC (le serveur est téléchargé au premier lancement, ça peut prendre une minute).\n2. Dans Blender : Édition, Préférences, Extensions, « Dépôts », ajoute le dépôt https://lab.blender.org/ (menu « + »).\n3. Cherche l'extension « MCP » dans la liste, installe-la et active-la.\n4. Garde Blender ouvert avec ta scène, puis ajoute ce connecteur.", "https://www.blender.org/lab/mcp-server/",
+        ),
         web(
             "unreal-58", "Unreal Engine 5.8 (officiel)", "Serveur MCP intégré à l'éditeur : acteurs, niveaux, matériaux, Blueprints, tests. Le modèle découvre les outils à la demande (3 outils seulement dans son contexte).", "Jeu vidéo",
             "http://127.0.0.1:{port}/mcp",
@@ -382,6 +387,9 @@ mod tests {
         let (entry, _) = build_entry(&get("godot"), &v).unwrap();
         assert_eq!(entry["env"]["GODOT_PATH"], "C:\\Godot\\godot.exe");
         assert_eq!(get("unity").args[0], "--from");
+        let blender = get("blender");
+        assert_eq!((blender.command, blender.category), ("uvx", "Création 3D"));
+        assert!(blender.args[1].ends_with("#subdirectory=mcp"));
     }
 
     #[test]
