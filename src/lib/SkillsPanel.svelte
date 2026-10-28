@@ -3,6 +3,8 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { onMount } from "svelte";
   import type { ChatStore } from "$lib/chat.svelte";
+  import { askConfirm } from "$lib/dialogs.svelte";
+  import SkillEditor from "$lib/SkillEditor.svelte";
 
   let { chat }: { chat: ChatStore } = $props();
 
@@ -27,9 +29,8 @@
 
   // --- skills de Claude déjà présents sur le PC ---
 
-  // --- création ---
-  let skillName = $state("");
-  let skillDesc = $state("");
+  // --- création et modification ---
+  let editor = $state<{ name: string | null } | null>(null);
 
   const shown = $derived(
     entries.filter((e) => !filter.trim() || `${e.name} ${e.source}`.toLowerCase().includes(filter.trim().toLowerCase())),
@@ -113,12 +114,12 @@
     await chat.loadSkills();
   }
 
-  async function createSkill() {
+  async function removeSkill(name: string) {
+    if (!(await askConfirm(`Supprimer le skill /${name} ? Son dossier est effacé de ce PC.`, "Supprimer"))) return;
     try {
-      await invoke("skill_create", { name: skillName, description: skillDesc });
-      skillName = skillDesc = "";
+      await invoke("skill_delete", { workspace: chat.mode === "code" && chat.workspace ? chat.workspace : null, name });
       await chat.loadSkills();
-      msg = "Skill créé : complète le fichier SKILL.md qui vient de s'ouvrir.";
+      msg = `Skill /${name} supprimé.`;
     } catch (e) {
       msg = String(e);
     }
@@ -135,7 +136,7 @@
 
 <div class="panel">
   <p class="muted">Un skill est un dossier avec un fichier <code>SKILL.md</code> (le même format que chez Claude). Lama garde la liste de tes skills activés, cherche le bon pour ta demande et le charge.
-    Tape <code>/nom</code> pour en forcer un. Il n'y a pas de limite au nombre de skills.
+    Tape <code>/nom</code> pour en forcer un. Il n'y a pas de limite au nombre de skills. Crée le tien avec « Nouveau skill » : Lama peut même le rédiger pour toi.
     Un skill peut contenir des scripts que l'agent lance <strong>avec tes autorisations</strong> : n'installe que des sources en lesquelles tu as confiance.</p>
   {#if msg}<p class="msg">{msg}</p>{/if}
 
@@ -144,6 +145,7 @@
     <div class="head">
       <h3>Installés ({enabledCount} activés / {chat.skills.length})</h3>
       <div class="row">
+        <button class="primary" onclick={() => (editor = { name: null })}>+ Nouveau skill</button>
         <button onclick={() => invoke("skills_open_dir")}>Ouvrir le dossier</button>
         <button onclick={() => chat.loadSkills()}>Actualiser</button>
       </div>
@@ -159,9 +161,11 @@
             <strong>/{s.name}</strong><span class="badge">{s.scope === "app" ? "global" : "projet"}</span>{#if s.model_invocable === false}<span class="badge" title="Le modèle ne le choisit pas seul : à lancer avec /{s.name}">manuel</span>{/if}{#if s.argument_hint}<span class="badge" title="Arguments : /{s.name} {s.argument_hint}">{s.argument_hint}</span>{/if}
             <div class="muted clip">{s.description || "Sans description"}</div>
           </div>
+          <button class="mini" onclick={() => (editor = { name: s.name })} aria-label="Modifier /{s.name}">Modifier</button>
+          <button class="mini" onclick={() => removeSkill(s.name)} aria-label="Supprimer /{s.name}">Supprimer</button>
         </li>
       {:else}
-        <li class="muted">{chat.skills.length ? "Aucun skill ne correspond." : "Aucun skill installé. Installe-en depuis skills.sh ou importe ceux de Claude ci-dessous."}</li>
+        <li class="muted">{chat.skills.length ? "Aucun skill ne correspond." : "Aucun skill pour l'instant. Crée le tien avec « Nouveau skill », ou installe-en depuis skills.sh ci-dessous."}</li>
       {/each}
     </ul>
   </section>
@@ -209,16 +213,11 @@
     <p class="muted">Le classement est lu depuis la page publique de skills.sh ; les skills sont téléchargés depuis leur dépôt GitHub.</p>
   </section>
 
-  <!-- ===== création ===== -->
-  <section>
-    <h3>Créer un skill</h3>
-    <div class="stack">
-      <input bind:value={skillName} placeholder="Nom, ex. revue-de-code" />
-      <input bind:value={skillDesc} placeholder="Quand l'utiliser ? (description courte)" />
-      <button class="primary" disabled={!skillName.trim() || !skillDesc.trim()} onclick={createSkill}>Créer et ouvrir</button>
-    </div>
-  </section>
 </div>
+
+{#if editor}
+  <SkillEditor {chat} editing={editor.name} onclose={() => (editor = null)} onsaved={(m) => { msg = m; editor = null; }} />
+{/if}
 
 {#if review}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -261,13 +260,13 @@
   code { background: var(--code); padding: 1px 6px; border-radius: 5px; font-size: 12.5px; }
   .row { display: flex; gap: 8px; align-items: center; }
   .row.end { justify-content: flex-end; }
-  .stack { display: flex; flex-direction: column; gap: 8px; }
   .grow { flex: 1; min-width: 0; }
   .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   input:not([type="checkbox"]) { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; outline: none; }
   input:focus { border-color: var(--accent); }
   button { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 6px 12px; }
   button:disabled { opacity: 0.45; }
+  .mini { padding: 3px 9px; font-size: 12.5px; }
   .primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
   .link { border: 0; background: none; color: var(--accent); padding: 0; text-align: left; text-decoration: underline; }
   .seg { display: inline-flex; background: var(--hover); border-radius: 10px; padding: 3px; }

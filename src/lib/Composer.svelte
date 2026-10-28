@@ -160,6 +160,7 @@
       onkeydown={onKey}
       onpaste={onPaste}
       rows="1"
+      aria-label="Ton message"
       placeholder={chat.busy ? "Ajoute une précision : elle sera prise en compte sans interrompre la tâche…" : placeholder || (chat.mode === "chat" ?"Écris un message…  ( / pour les commandes )" : "Décris la tâche…  ( / pour les commandes )")}
     ></textarea>
     <div class="row">

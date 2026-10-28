@@ -43,7 +43,7 @@
     <button role="tab" aria-selected={chat.mode === "code"} class:on={chat.mode === "code"} onclick={() => chat.setMode("code")}>Code</button>
   </div>
 
-  <input class="search" placeholder="Rechercher…" bind:value={chat.search} oninput={() => chat.loadConvs()} />
+  <input class="search" placeholder="Rechercher…" aria-label="Rechercher dans les conversations" bind:value={chat.search} oninput={() => chat.loadConvs()} />
 
   <nav>
     <button class="navb" onclick={() => chat.newChat()}><span class="plus">+</span> {chat.mode === "chat" ? "Nouveau" : "Nouvelle session"}</button>

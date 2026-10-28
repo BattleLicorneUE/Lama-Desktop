@@ -1381,33 +1381,54 @@ fn skills_open_dir(app: AppHandle) -> Result<String, String> {
     Ok(dir.to_string_lossy().into_owned())
 }
 
-/// Crée un squelette de skill et renvoie son dossier.
+/// Un skill ouvert dans l'éditeur : son contenu, sa portée et son dossier.
+#[derive(serde::Serialize)]
+struct SkillEdit {
+    draft: skills::Draft,
+    scope: String,
+    dir: String,
+}
+
+fn find_skill(app: &AppHandle, workspace: Option<String>, name: &str) -> Result<skills::Skill, String> {
+    let ws = workspace.filter(|w| !w.trim().is_empty()).map(std::path::PathBuf::from);
+    scan_skills_fresh(app, ws.as_deref())?.into_iter().find(|s| s.name.eq_ignore_ascii_case(name)).ok_or_else(|| "Skill introuvable.".to_string())
+}
+
+/// Contenu d'un skill pour l'éditeur.
 #[tauri::command]
-fn skill_create(app: AppHandle, name: String, description: String) -> Result<String, String> {
-    let slug: String = name
-        .trim()
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .trim_matches('-')
-        .to_string();
-    if slug.is_empty() {
-        return Err("Nom de skill invalide".into());
-    }
-    let dir = skills_dir(&app)?.join(&slug);
-    if dir.exists() {
-        return Err(format!("Le skill « {slug} » existe déjà"));
-    }
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let desc = description.replace('\n', " ");
-    std::fs::write(
-        dir.join("SKILL.md"),
-        format!("---\nname: {slug}\ndescription: {desc}\n---\n\n# {slug}\n\nDécris ici, étape par étape, comment réaliser cette tâche.\n"),
-    )
-    .map_err(|e| e.to_string())?;
-    std::process::Command::new("notepad").arg(dir.join("SKILL.md")).spawn().map_err(|e| e.to_string())?;
+fn skill_get(app: AppHandle, workspace: Option<String>, name: String) -> Result<SkillEdit, String> {
+    let s = find_skill(&app, workspace, &name)?;
+    Ok(SkillEdit { draft: skills::read_draft(&s.dir)?, scope: s.scope, dir: s.dir.to_string_lossy().into_owned() })
+}
+
+/// Crée ou modifie un skill (`original` : le nom du skill modifié). `scope` : « app » (tous les projets) ou « project » (`.skills/` du dossier de travail).
+#[tauri::command]
+fn skill_save(app: AppHandle, workspace: Option<String>, draft: skills::Draft, scope: String, original: Option<String>) -> Result<String, String> {
+    let existing = match original.as_deref().filter(|n| !n.trim().is_empty()) {
+        Some(n) => Some(find_skill(&app, workspace.clone(), n)?),
+        None => None,
+    };
+    let root = match &existing {
+        Some(s) => s.dir.parent().map(std::path::Path::to_path_buf).ok_or("Dossier du skill introuvable.")?,
+        None if scope == "project" => {
+            let ws = workspace.filter(|w| !w.trim().is_empty()).ok_or("Ouvre d'abord un dossier de travail pour créer un skill de projet.")?;
+            std::path::PathBuf::from(ws).join(".skills")
+        }
+        None => skills_dir(&app)?,
+    };
+    let dir = skills::save(&root, &draft, existing.as_ref().map(|s| s.dir.as_path()))?;
+    invalidate_skills(&app);
     Ok(dir.to_string_lossy().into_owned())
+}
+
+/// Supprime un skill (son dossier entier).
+#[tauri::command]
+fn skill_delete(app: AppHandle, workspace: Option<String>, name: String) -> Result<(), String> {
+    let s = find_skill(&app, workspace, &name)?;
+    let root = s.dir.parent().map(std::path::Path::to_path_buf).ok_or("Dossier du skill introuvable.")?;
+    skills::delete(&root, &s.dir)?;
+    invalidate_skills(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -2012,7 +2033,7 @@ pub fn run() {
             cloud_models, cloud_test, chat_start, chat_cancel,
             agent_start, agent_inject, agent_approve, agent_undo, mcp_status, mcp_reload, mcp_config_file, mcp_edit_config,
             fs_list, term_run, read_attachment,
-            skills_list, skill_read, skills_open_dir, skill_create,
+            skills_list, skill_read, skills_open_dir, skill_get, skill_save, skill_delete,
             skill_set_enabled, skills_auto_import, skills_import, skills_hub_browse, skills_hub_fetch,
             memory_list, memory_add, memory_delete, memory_project_list,
             notify_os, browser_status, browser_launch_ui, browser_close_ui, browser_wipe, vault_browser_login, vault_status, vault_create, vault_unlock, vault_lock, vault_list, vault_login_get, vault_login_save, vault_login_delete, vault_info_save, vault_info_delete, vault_generate, vault_set_agent_access, vault_change_master, vault_destroy, vault_copy, vault_fill_ui, schedules_list, schedule_save, schedule_delete, schedule_done,

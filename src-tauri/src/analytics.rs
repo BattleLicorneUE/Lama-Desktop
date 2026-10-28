@@ -37,7 +37,7 @@ pub const EVENTS: &[(&str, &str)] = &[
 /// Commandes de l'application comptées comme « fonction essayée » : le nom de la commande, jamais ses arguments.
 pub const FEATURES: &[(&str, &str)] = &[
     ("data_backup", "backup"), ("data_restore", "restore"), ("data_export_chats", "export_chats"), ("export_document", "export_document"),
-    ("skill_create", "skill_created"), ("skills_import", "skill_imported"), ("agent_create", "agent_created"), ("agents_import_claude", "agents_imported"),
+    ("skill_save", "skill_saved"), ("skill_delete", "skill_deleted"), ("skills_import", "skill_imported"), ("agent_create", "agent_created"), ("agents_import_claude", "agents_imported"),
     ("project_create", "project_created"), ("project_from_template", "project_from_template"), ("schedule_save", "task_scheduled"),
     ("vault_create", "vault_created"), ("vault_fill_ui", "vault_fill"), ("vault_browser_login", "vault_browser_login"),
     ("window_new", "new_window"), ("mcp_add_custom", "custom_server"), ("mcp_import", "mcp_import"), ("voice_dictation", "voice"),

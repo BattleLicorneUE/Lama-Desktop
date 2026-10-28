@@ -50,7 +50,7 @@ export function installMock() {
     { id: "p3", name: "The Purifier", instructions: "The Purifier est un jeu vidéo d'aventure psychologique et horrifique à la première personne, développé sous Unreal Engine 5, se déroulant dans une France médiévale fictive.", kind: "chat", workspace: null, pinned: false, updated_at: now - 86400 * 400, chats: 0 },
     { id: "p4", name: "the-purifier", instructions: "Projet Unreal Engine 5. Compiler avec UnrealBuildTool avant de conclure.", kind: "code", workspace: "C:/Users/Battl/Desktop/the-purifier", pinned: false, updated_at: now - 7200, chats: 1 },
   ];
-  const skills = [
+  let skills: { name: string; description: string; dir: string; scope: string; enabled: boolean; argument_hint?: string | null; model_invocable?: boolean; user_invocable?: boolean }[] = [
     { name: "frontend-design", description: "Crée des interfaces web soignées, loin des gabarits génériques.", dir: "C:\\skills\\frontend-design", scope: "app", enabled: true },
     { name: "revue-de-code", description: "Relit un diff et signale bugs et oublis.", dir: "C:\\skills\\revue", scope: "app", enabled: true },
     { name: "pdf", description: "Lire et remplir des PDF.", dir: "C:\\skills\\pdf", scope: "app", enabled: false },
@@ -284,6 +284,22 @@ export function installMock() {
         return [{ id: 1, text: "Préfère les réponses courtes et en français" }];
       case "skills_list":
         return skills;
+      case "skill_get": {
+        const s = skills.find((x) => x.name === args.name);
+        if (!s) throw "Skill introuvable.";
+        return { draft: { name: s.name, description: s.description, body: "# Objectif\n\nInstructions de " + s.name + ".", argument_hint: s.argument_hint ?? "", model_invocable: s.model_invocable !== false }, scope: s.scope, dir: s.dir };
+      }
+      case "skill_save": {
+        const d = args.draft as { name: string; description: string; argument_hint: string; model_invocable: boolean };
+        const slug = d.name.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
+        if (skills.some((x) => x.name === slug && x.name !== args.original)) throw `Un skill « ${slug} » existe déjà : choisis un autre nom, ou modifie celui-là.`;
+        const entry = { name: slug, description: d.description, dir: "C:/skills/" + slug, scope: String(args.scope), enabled: true, argument_hint: d.argument_hint || null, model_invocable: d.model_invocable, user_invocable: true };
+        skills = args.original ? skills.map((x) => (x.name === args.original ? entry : x)) : [...skills, entry];
+        return entry.dir;
+      }
+      case "skill_delete":
+        skills = skills.filter((x) => x.name !== args.name);
+        return null;
       case "skills_hub_browse":
         return [
           { rank: 1, name: "find-skills", source: "vercel-labs/skills", id: "vercel-labs/skills/find-skills", installs: "3.9M" },
@@ -431,6 +447,8 @@ export function installMock() {
       case "bg_clear":
         return null;
       case "chat_once":
+        if (String((args.messages as { content: string }[])?.[0]?.content ?? "").includes("« skills »"))
+          return "Voici le skill :\n```json\n" + JSON.stringify({ name: "repondre-aux-clients", description: "Utilise ce skill quand on demande de répondre à un mail de client, poliment et en deux phrases.", argument_hint: "[le mail du client]", body: "# Réponse client\n\nMail reçu : $ARGUMENTS\n\n1. Remercie le client.\n2. Réponds à sa question en deux phrases.\n3. Termine par une formule polie.\n" }) + "\n```";
         if (String((args.messages as { content: string }[])?.[0]?.content ?? "").includes("relecteur de code senior"))
           return JSON.stringify({ summary: "La fonction total() a été réécrite avec une boucle.", findings: [
             { file: "src/app.js", line: 3, severity: "bug", title: "Boucle qui dépasse le tableau", detail: "La condition i <= items.length lit items[items.length], qui est undefined : TypeError sur la dernière itération.", fix: "Utiliser i < items.length (ou garder reduce)." },

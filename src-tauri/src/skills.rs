@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 const MAX_BODY: usize = 30_000;
 
@@ -438,6 +438,144 @@ pub fn import(src: &Path, dest_root: &Path) -> Result<bool, String> {
     Ok(true)
 }
 
+
+// ------------------------------------------------------------------ création et modification
+
+const MIN_DESCRIPTION: usize = 8;
+const MAX_DESCRIPTION: usize = 500;
+const MAX_NAME: usize = 48;
+/// Noms que Windows réserve à des périphériques : un dossier ainsi nommé ne s'ouvre plus.
+const RESERVED: &[&str] = &["con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"];
+
+fn yes() -> bool {
+    true
+}
+
+/// Ce que l'utilisateur écrit dans l'éditeur de skill.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct Draft {
+    pub name: String,
+    pub description: String,
+    pub body: String,
+    #[serde(default)]
+    pub argument_hint: String,
+    /// Faux : le modèle ne le choisit pas seul, il faut taper `/nom`.
+    #[serde(default = "yes")]
+    pub model_invocable: bool,
+}
+
+/// Nom de dossier et de commande : minuscules, chiffres et tirets.
+pub fn slugify(name: &str) -> String {
+    let mut out = String::new();
+    for c in name.trim().to_lowercase().chars() {
+        let c = if c.is_alphanumeric() { c } else { '-' };
+        if c == '-' && (out.is_empty() || out.ends_with('-')) {
+            continue;
+        }
+        out.push(c);
+    }
+    out.trim_matches('-').to_string()
+}
+
+fn one_line(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+pub fn validate(d: &Draft) -> Result<String, String> {
+    let slug = slugify(&d.name);
+    if slug.is_empty() {
+        return Err("Donne un nom au skill (lettres, chiffres et tirets).".into());
+    }
+    if slug.chars().count() > MAX_NAME {
+        return Err(format!("Le nom est trop long ({MAX_NAME} caractères au plus)."));
+    }
+    if RESERVED.contains(&slug.as_str()) {
+        return Err(format!("« {slug} » est un nom réservé par Windows : choisis-en un autre."));
+    }
+    let desc = one_line(&d.description);
+    if desc.chars().count() < MIN_DESCRIPTION {
+        return Err("Explique en une ou deux phrases quand utiliser ce skill : c'est ce qui permet à Lama de le choisir.".into());
+    }
+    if desc.chars().count() > MAX_DESCRIPTION {
+        return Err(format!("La description est trop longue ({MAX_DESCRIPTION} caractères au plus) : garde l'essentiel, le détail va dans les instructions."));
+    }
+    let body = d.body.trim();
+    if body.chars().count() < 10 {
+        return Err("Écris les instructions du skill : ce que Lama doit faire, étape par étape.".into());
+    }
+    if body.len() > MAX_BODY {
+        return Err(format!("Les instructions sont trop longues ({} Ko au plus).", MAX_BODY / 1000));
+    }
+    Ok(slug)
+}
+
+/// Contenu du fichier `SKILL.md`. La description passe par un bloc YAML pour supporter les « : » et les guillemets.
+pub fn render(d: &Draft, slug: &str) -> String {
+    let mut s = format!("---\nname: {slug}\ndescription: >-\n  {}\n", one_line(&d.description));
+    let hint = one_line(&d.argument_hint).replace('"', "'");
+    if !hint.is_empty() {
+        s.push_str(&format!("argument-hint: \"{hint}\"\n"));
+    }
+    if !d.model_invocable {
+        s.push_str("disable-model-invocation: true\n");
+    }
+    s.push_str(&format!("---\n\n{}\n", d.body.replace("\r\n", "\n").trim()));
+    s
+}
+
+/// Relit un skill pour le modifier.
+pub fn read_draft(dir: &Path) -> Result<Draft, String> {
+    let text = std::fs::read_to_string(dir.join("SKILL.md")).map_err(|e| format!("Lecture impossible : {e}"))?;
+    let m = parse_meta(&text);
+    let folder = dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    Ok(Draft {
+        name: m.name.unwrap_or(folder),
+        description: m.description.unwrap_or_default(),
+        body: m.body.trim().to_string(),
+        argument_hint: m.argument_hint.unwrap_or_default(),
+        model_invocable: !m.disable_model,
+    })
+}
+
+fn same_dir(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => false,
+    }
+}
+
+/// Enregistre un skill dans `root`. `original` : le dossier du skill modifié (renommé si le nom change, ses fichiers annexes suivent).
+pub fn save(root: &Path, d: &Draft, original: Option<&Path>) -> Result<PathBuf, String> {
+    let slug = validate(d)?;
+    std::fs::create_dir_all(root).map_err(|e| e.to_string())?;
+    let target = root.join(&slug);
+    if target.exists() && !original.is_some_and(|o| same_dir(o, &target)) {
+        return Err(format!("Un skill « {slug} » existe déjà : choisis un autre nom, ou modifie celui-là."));
+    }
+    if let Some(o) = original {
+        if !same_dir(o, &target) {
+            // Seul un dossier de la liste des skills peut être renommé.
+            if o.parent().map(|p| same_dir(p, root)) != Some(true) {
+                return Err("Ce skill ne peut pas être renommé d'ici.".into());
+            }
+            std::fs::rename(o, &target).map_err(|e| format!("Renommage impossible : {e}"))?;
+        }
+    }
+    std::fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+    let tmp = target.join("SKILL.md.tmp");
+    std::fs::write(&tmp, render(d, &slug)).map_err(|e| format!("Écriture impossible : {e}"))?;
+    std::fs::rename(&tmp, target.join("SKILL.md")).map_err(|e| format!("Écriture impossible : {e}"))?;
+    Ok(target)
+}
+
+/// Supprime un skill : seulement un dossier placé directement dans `root`.
+pub fn delete(root: &Path, dir: &Path) -> Result<(), String> {
+    if dir.parent().map(|p| same_dir(p, root)) != Some(true) || !dir.join("SKILL.md").is_file() {
+        return Err("Ce dossier n'est pas un skill de la liste.".into());
+    }
+    std::fs::remove_dir_all(dir).map_err(|e| format!("Suppression impossible : {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -600,5 +738,123 @@ mod tests {
         assert_eq!(read_file(s, "notes.md").unwrap(), "ok");
         assert!(read_file(s, "../secret.txt").is_err());
         assert!(read_body(s, None).unwrap().contains("notes.md"));
+    }
+}
+
+#[cfg(test)]
+mod draft_tests {
+    use super::*;
+
+    fn tmp() -> PathBuf {
+        let d = std::env::temp_dir().join(format!("skilldraft-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    fn draft() -> Draft {
+        Draft {
+            name: "Relire un texte".into(),
+            description: "Utilise-le quand on demande : « relis ce texte », avec des \"guillemets\" et des deux-points.".into(),
+            body: "# Relecture\n\n1. Corrige les fautes.\n2. Garde le ton.\n".into(),
+            argument_hint: "[le texte]".into(),
+            model_invocable: true,
+        }
+    }
+
+    #[test]
+    fn names_become_safe_folder_names() {
+        assert_eq!(slugify("  Relire un texte !  "), "relire-un-texte");
+        assert_eq!(slugify("Révision__de--code"), "révision-de-code");
+        assert_eq!(slugify("../../etc"), "etc");
+        assert_eq!(slugify("a/b\\c:d"), "a-b-c-d");
+        assert_eq!(slugify("---"), "");
+    }
+
+    #[test]
+    fn a_written_skill_is_read_back_unchanged_even_with_colons_and_quotes() {
+        let root = tmp();
+        let dir = save(&root, &draft(), None).unwrap();
+        assert!(dir.ends_with("relire-un-texte"));
+        let back = read_draft(&dir).unwrap();
+        assert_eq!(back.name, "relire-un-texte");
+        assert_eq!(back.description, draft().description);
+        assert_eq!(back.body, draft().body.trim());
+        assert_eq!(back.argument_hint, "[le texte]");
+        assert!(back.model_invocable);
+        // Et le moteur de skills le voit avec la même description.
+        let all = scan(&root, None);
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].description, draft().description);
+        assert_eq!(all[0].argument_hint.as_deref(), Some("[le texte]"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn manual_only_skills_are_flagged_for_the_engine() {
+        let root = tmp();
+        let d = Draft { model_invocable: false, argument_hint: String::new(), ..draft() };
+        let dir = save(&root, &d, None).unwrap();
+        assert!(!read_draft(&dir).unwrap().model_invocable);
+        assert!(!scan(&root, None)[0].model_invocable);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn incomplete_or_dangerous_drafts_are_refused_with_a_helpful_message() {
+        let ok = draft();
+        for (bad, hint) in [
+            (Draft { name: "  ".into(), ..ok.clone() }, "nom"),
+            (Draft { name: "con".into(), ..ok.clone() }, "réservé"),
+            (Draft { description: "court".into(), ..ok.clone() }, "quand utiliser"),
+            (Draft { description: "x".repeat(501), ..ok.clone() }, "trop longue"),
+            (Draft { body: "  ".into(), ..ok.clone() }, "instructions"),
+            (Draft { body: "x".repeat(MAX_BODY + 1), ..ok.clone() }, "trop longues"),
+        ] {
+            let e = validate(&bad).unwrap_err();
+            assert!(e.to_lowercase().contains(hint), "{e} doit contenir « {hint} »");
+        }
+        assert!(validate(&ok).is_ok());
+    }
+
+    #[test]
+    fn a_name_that_already_exists_is_refused_but_editing_in_place_is_fine() {
+        let root = tmp();
+        let dir = save(&root, &draft(), None).unwrap();
+        assert!(save(&root, &draft(), None).unwrap_err().contains("existe déjà"));
+        let edited = Draft { body: "Nouvelles instructions détaillées.".into(), ..draft() };
+        save(&root, &edited, Some(&dir)).unwrap();
+        assert_eq!(read_draft(&dir).unwrap().body, "Nouvelles instructions détaillées.");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn renaming_keeps_the_attached_files() {
+        let root = tmp();
+        let dir = save(&root, &draft(), None).unwrap();
+        std::fs::write(dir.join("modele.txt"), "annexe").unwrap();
+        let renamed = Draft { name: "Relecture".into(), ..draft() };
+        let new_dir = save(&root, &renamed, Some(&dir)).unwrap();
+        assert!(!dir.exists() && new_dir.join("modele.txt").is_file());
+        assert_eq!(read_draft(&new_dir).unwrap().name, "relecture");
+        // Renommer vers le nom d'un autre skill est refusé et ne détruit rien.
+        let other = save(&root, &Draft { name: "Autre".into(), ..draft() }, None).unwrap();
+        assert!(save(&root, &Draft { name: "relecture".into(), ..draft() }, Some(&other)).unwrap_err().contains("existe déjà"));
+        assert!(other.join("SKILL.md").is_file() && new_dir.join("SKILL.md").is_file());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn only_listed_skills_can_be_deleted() {
+        let root = tmp();
+        let dir = save(&root, &draft(), None).unwrap();
+        let outside = tmp();
+        std::fs::write(outside.join("SKILL.md"), "x").unwrap();
+        assert!(delete(&root, &outside).is_err(), "un dossier hors de la liste n'est jamais supprimé");
+        assert!(delete(&root, &root).is_err());
+        assert!(outside.join("SKILL.md").exists());
+        delete(&root, &dir).unwrap();
+        assert!(!dir.exists());
+        let _ = std::fs::remove_dir_all(root);
+        let _ = std::fs::remove_dir_all(outside);
     }
 }
