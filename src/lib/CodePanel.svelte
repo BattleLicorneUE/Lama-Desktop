@@ -94,7 +94,7 @@
       {/each}
     </div>
     <form onsubmit={run}>
-      <input bind:value={cmd} placeholder="Commande PowerShell…" spellcheck="false" />
+      <input bind:value={cmd} placeholder="Commande PowerShell…" aria-label="Commande PowerShell" spellcheck="false" />
     </form>
   {/if}
 </aside>

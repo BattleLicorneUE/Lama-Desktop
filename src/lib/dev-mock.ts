@@ -452,6 +452,10 @@ export function installMock() {
       case "bg_clear":
         return null;
       case "chat_once":
+        if (String((args.messages as { content: string }[])?.[0]?.content ?? "").includes("tâche planifiée"))
+          return "```json\n" + JSON.stringify({ name: "Revue de presse Tauri", prompt: "Cherche sur le web les nouveautés sur Tauri de la semaine et résume-les en 5 points, chacun suivi de sa source." }) + "\n```";
+        if (String((args.messages as { content: string }[])?.[0]?.content ?? "").includes("instructions d'un projet"))
+          return JSON.stringify({ name: "Mémoire d'histoire", instructions: "Tu aides à rédiger un mémoire de master en histoire.\nTon : sobre et précis.\nCite toujours tes sources." });
         if (String((args.messages as { content: string }[])?.[0]?.content ?? "").includes("« skills »"))
           return "Voici le skill :\n```json\n" + JSON.stringify({ name: "repondre-aux-clients", description: "Utilise ce skill quand on demande de répondre à un mail de client, poliment et en deux phrases.", argument_hint: "[le mail du client]", body: "# Réponse client\n\nMail reçu : $ARGUMENTS\n\n1. Remercie le client.\n2. Réponds à sa question en deux phrases.\n3. Termine par une formule polie.\n" }) + "\n```";
         if (String((args.messages as { content: string }[])?.[0]?.content ?? "").includes("relecteur de code senior"))

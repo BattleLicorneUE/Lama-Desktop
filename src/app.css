@@ -71,6 +71,8 @@ html, body { margin: 0; height: 100%; }
 body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; }
 button, select, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
+/* Cibles de clic : 24 × 24 px au moins (WCAG 2.2), même pour les petites croix et les boutons qui ressemblent à des liens. */
+button { min-width: 24px; min-height: 24px; }
 /* Contrôles natifs : fond et texte du thème (sinon les listes déroulantes restent blanches en mode sombre). */
 select, option, optgroup { background-color: var(--surface); color: var(--fg); }
 select { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }

@@ -40,6 +40,12 @@ const marked = new Marked({ gfm: true, breaks: true, extensions: [mathBlock, mat
 // fuiter une information après une injection dans un document. On ne garde que les images locales (données intégrées).
 const LOCAL_SRC = /^(data:image\/|blob:|asset:|https?:\/\/asset\.localhost)/i;
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  // Seules les cases à cocher des listes de tâches (« - [ ] ») sont des champs ; elles ne se cochent pas.
+  if (node instanceof HTMLInputElement) {
+    if (node.type !== "checkbox") node.remove();
+    else node.setAttribute("disabled", "");
+    return;
+  }
   if (node instanceof Element && node.hasAttribute("style") && /url\s*\(|image-set\s*\(|@import|expression\s*\(/i.test(node.getAttribute("style") ?? "")) {
     node.removeAttribute("style");
   }
@@ -58,7 +64,12 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
 
 /** Markdown -> HTML nettoyé (synchrone, utilisable pendant le streaming). */
 export function renderMarkdown(src: string): string {
-  return DOMPurify.sanitize(marked.parse(src, { async: false }) as string, { ADD_ATTR: ["style"] });
+  // Pas de formulaire : un « action » vers un site extérieur emmènerait la fenêtre de l'application hors de l'application.
+  return DOMPurify.sanitize(marked.parse(src, { async: false }) as string, {
+    ADD_ATTR: ["style"],
+    FORBID_TAGS: ["form", "textarea", "select", "option", "button", "dialog", "base", "meta", "link"],
+    FORBID_ATTR: ["action", "formaction", "form", "ping"],
+  });
 }
 
 let highlighter: Promise<Highlighter> | undefined;

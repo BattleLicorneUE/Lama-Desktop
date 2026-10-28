@@ -177,7 +177,7 @@
       <button onclick={() => open("https://skills.sh")}>Ouvrir le site ↗</button>
     </div>
     <form class="row" onsubmit={(e) => { e.preventDefault(); if (paste.trim()) prepare(paste); }}>
-      <input class="grow" bind:value={paste} placeholder="Colle une commande (npx skills add …), une URL skills.sh / GitHub, ou owner/repo" disabled={busy} />
+      <input class="grow" bind:value={paste} aria-label="Commande, adresse ou dépôt à installer" placeholder="Colle une commande (npx skills add …), une URL skills.sh / GitHub, ou owner/repo" disabled={busy} />
       <button class="primary" disabled={!paste.trim() || busy}>Ajouter</button>
     </form>
 
@@ -187,7 +187,7 @@
           <button class:on={view === id} onclick={() => loadHub(id as "all" | "trending" | "hot")}>{label}</button>
         {/each}
       </div>
-      <input class="grow" bind:value={filter} placeholder="Filtrer la liste…" />
+      <input class="grow" bind:value={filter} placeholder="Filtrer la liste…" aria-label="Filtrer le classement" />
     </div>
     {#if looksLikeSource && filter.trim()}
       <button class="link" onclick={() => prepare(filter)} disabled={busy}>Chercher « {filter.trim()} » sur GitHub →</button>

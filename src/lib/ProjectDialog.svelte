@@ -2,9 +2,12 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
-  import type { Attachment, DocDraft, Project, ProjectDoc } from "$lib/chat.svelte";
+  import type { Attachment, ChatStore, DocDraft, Project, ProjectDoc } from "$lib/chat.svelte";
+  import DraftWithLama from "$lib/DraftWithLama.svelte";
+  import { PROJECT_WRITER_PROMPT } from "$lib/lama-draft";
 
-  let { project, code = false, onsave, oncancel }: {
+  let { chat, project, code = false, onsave, oncancel }: {
+    chat: ChatStore;
     project: Project | null;
     /** Projet de code : lié à un dossier de travail. */
     code?: boolean;
@@ -72,6 +75,16 @@
   <div class="dialog" role="dialog" aria-modal="true" aria-label={project ? "Modifier le projet" : "Nouveau projet"}>
   <form onsubmit={submit}>
     <h2>{project ? "Modifier le projet" : "Nouveau projet"}</h2>
+    {#if !project}
+      <DraftWithLama
+        {chat}
+        system={PROJECT_WRITER_PROMPT}
+        subject="les instructions"
+        placeholder={code ? "Décris-le en une phrase : « une appli Tauri en Svelte, tests avec npm test »" : "Décris-le en une phrase : « le suivi de mon mémoire de master en histoire »"}
+        filled={!!instructions.trim()}
+        onfill={(f) => { if (f.name?.trim() && !name.trim()) name = f.name.trim(); if (f.instructions?.trim()) instructions = f.instructions.trim(); }}
+      />
+    {/if}
     <label>
       Nom
       <!-- svelte-ignore a11y_autofocus -->

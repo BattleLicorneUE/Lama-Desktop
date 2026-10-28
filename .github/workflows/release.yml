@@ -40,6 +40,8 @@ jobs:
 
       - run: npm run check
 
+      - run: npm test
+
       - run: cargo test --lib --manifest-path src-tauri/Cargo.toml
 
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0

@@ -111,7 +111,7 @@
   Les documents créés par l'agent dans <code>Documents\Lama Desktop</code> et tes propres dossiers de travail ne sont pas touchés.</p>
   <label class="field">
     <span>Pour confirmer, tape <code>EFFACER</code></span>
-    <input bind:value={confirmText} autocomplete="off" spellcheck="false" placeholder="EFFACER" />
+    <input bind:value={confirmText} autocomplete="off" spellcheck="false" placeholder="EFFACER" aria-label="Tape EFFACER pour confirmer" />
   </label>
   <div class="row"><button class="del" onclick={erase} disabled={busy || confirmText.trim() !== "EFFACER"}>Effacer toutes mes données</button></div>
 </section>

@@ -217,7 +217,7 @@
     {#if open.rules}
       {#if chat.workspace}
         <p class="note">Fichier <code>AGENTS.md</code> à la racine du projet : l'agent le lit à chaque tâche.</p>
-        <textarea bind:value={rules} rows="6" spellcheck="false" placeholder="Ex. TypeScript strict. Lancer npm test après chaque modification. Pas de nouvelle dépendance sans me demander."></textarea>
+        <textarea bind:value={rules} aria-label="Règles du projet" rows="6" spellcheck="false" placeholder="Ex. TypeScript strict. Lancer npm test après chaque modification. Pas de nouvelle dépendance sans me demander."></textarea>
         <button class="mini wide" onclick={saveRules} disabled={rules === savedRules}>Enregistrer</button>
         {#if rulesMsg}<p class="note" role="status">{rulesMsg}</p>{/if}
       {:else}

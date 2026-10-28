@@ -136,7 +136,7 @@
           <strong title={chat.workspace}>{folderName}</strong>
           <span class="path">{chat.workspace}</span>
         {:else}
-          <input class="path-input" placeholder="Dossier de travail" bind:value={chat.workspace} />
+          <input class="path-input" placeholder="Dossier de travail" aria-label="Dossier de travail" bind:value={chat.workspace} />
           <button class="browse" onclick={() => chat.pickFolder()}>Parcourir…</button>
           <button class="browse" onclick={() => (showTemplates = true)}>Modèle…</button>
         {/if}
@@ -219,7 +219,7 @@
   <Onboarding {chat} defaultName={profile.name} />
 {/if}
 {#if chat.projectDialog}
-  <ProjectDialog project={chat.projectDialog === "new" ? null : chat.projectDialog} code={chat.projectDialog === "new" ? chat.mode === "code" : chat.projectDialog.kind === "code"} onsave={saveProject} oncancel={() => (chat.projectDialog = null)} />
+  <ProjectDialog {chat} project={chat.projectDialog === "new" ? null : chat.projectDialog} code={chat.projectDialog === "new" ? chat.mode === "code" : chat.projectDialog.kind === "code"} onsave={saveProject} oncancel={() => (chat.projectDialog = null)} />
 {/if}
 {#if showModels}<ModelsDialog {chat} onclose={() => (showModels = false)} />{/if}
 <Celebrate {chat} />

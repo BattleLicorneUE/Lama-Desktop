@@ -2,9 +2,12 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions numérotées selon [SemVer](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [0.3.2] - 2026-10-28
 
 ### Ajouté
+- **Rédaction avec Lama** pour les tâches planifiées et les projets : une phrase suffit pour remplir le nom et les instructions.
+- **Premier lancement simplifié** : un modèle local s'installe en un clic depuis l'écran d'accueil, ou on colle une clé cloud.
+- **Tests automatiques** (vitest) de l'interface, lancés par l'intégration continue et avant chaque publication.
 - **Éditeur de skills** : « Nouveau skill » ouvre un vrai éditeur (nom, quand l'utiliser, instructions) au lieu d'un fichier à compléter dans le Bloc-notes. On peut partir d'un modèle (relire, résumer, message de commit, expliquer du code) ou décrire son idée en une phrase et laisser Lama rédiger le skill.
 - **Modifier et supprimer un skill** depuis la liste ; renommer un skill garde ses fichiers annexes.
 - Un skill peut être réservé à la commande `/nom` (Lama ne le choisit pas seul) et rangé pour un seul projet.
@@ -21,6 +24,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), ver
 - **Téléchargements interrompus** : leur taille est visible et un bouton « Nettoyer » les supprime.
 
 ### Corrigé
+- **Sécurité** : une politique de sécurité du contenu stricte limite les connexions réseau de l'interface et interdit l'envoi de formulaires vers l'extérieur ; les formulaires HTML contenus dans des réponses ou aperçus sont neutralisés.
+- La recherche dans les Réglages tolère les pluriels et les accents.
+- Cibles de clic d'au moins 24 px et champs sans nom étiquetés.
 - Les descriptions de skills contenant des deux-points ou des guillemets sont écrites sans casser l'en-tête du fichier.
 - Les champs de message et de recherche de conversation ont un nom pour les lecteurs d'écran.
 - Les modèles dont le nom contient un point (`qwen3-1.7b`, `llama3.2-3b`, `qwen2.5-coder-7b`) ne pouvaient pas être supprimés.

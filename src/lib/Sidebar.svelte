@@ -59,6 +59,7 @@
       {#if renaming === c.id}
         <input
           class="rename"
+          aria-label="Nouveau nom de la conversation"
           use:focusSelect
           bind:value={draft}
           onblur={() => finishRename(c)}

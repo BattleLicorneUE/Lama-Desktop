@@ -85,8 +85,13 @@
     },
     { label: "À propos", items: [{ id: "update", label: "Mises à jour", icon: "download", words: "version nouveautés" }] },
   ];
-  const match = (i: Item, q: string) => `${i.label} ${i.words}`.toLowerCase().includes(q);
-  const visible = (items: Item[]) => items.filter((i) => !find.trim() || match(i, find.trim().toLowerCase()));
+  // Sans accents ni majuscules, et chaque mot tapé doit se retrouver quelque part : « mot de passe » trouve « mots de passe ».
+  const plain = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const match = (i: Item, q: string) => {
+    const hay = plain(`${i.label} ${i.words}`);
+    return plain(q).split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+  };
+  const visible = (items: Item[]) => items.filter((i) => !find.trim() || match(i, find.trim()));
 
   /** Titre et phrase d'introduction de chaque page. */
   const PAGES: Record<Tab, { title: string; intro: string }> = {
@@ -344,7 +349,7 @@
           </p>
           <p class="muted">Ce que Lama sait de toi (usages, style de réponse) se règle dans <button class="linkbtn" onclick={() => (tab = "profile")}>Mon profil</button>.</p>
           <form class="row" onsubmit={(e) => { e.preventDefault(); addMemory(); }}>
-            <input class="grow" bind:value={newMemory} placeholder="Par exemple : je préfère les réponses courtes" />
+            <input class="grow" bind:value={newMemory} placeholder="Par exemple : je préfère les réponses courtes" aria-label="Nouveau souvenir" />
             <button class="primary" disabled={!newMemory.trim()}>Ajouter</button>
           </form>
           <ul>

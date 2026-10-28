@@ -144,7 +144,7 @@
   <div class="user">
     {#if editing}
       <div class="edit">
-        <textarea bind:value={draft} rows="3"></textarea>
+        <textarea bind:value={draft} rows="3" aria-label="Modifier ton message"></textarea>
         <div class="row">
           <button onclick={() => (editing = false)}>Annuler</button>
           <button class="primary" onclick={saveEdit} disabled={!draft.trim()}>Envoyer</button>

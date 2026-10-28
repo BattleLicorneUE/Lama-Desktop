@@ -5,6 +5,8 @@
   import { DAYS, REPEATS, dateInput, describeNext, describeRepeat, type Repeat, type ScheduledTask } from "$lib/schedule";
   import Icon from "$lib/Icon.svelte";
   import Select from "$lib/Select.svelte";
+  import DraftWithLama from "$lib/DraftWithLama.svelte";
+  import { TASK_WRITER_PROMPT } from "$lib/lama-draft";
 
   let { chat }: { chat: ChatStore } = $props();
 
@@ -80,6 +82,16 @@
 
   {#if form}
     <form class="card" onsubmit={(e) => { e.preventDefault(); save(); }}>
+      {#if !form.id}
+        <DraftWithLama
+          {chat}
+          system={TASK_WRITER_PROMPT}
+          subject="la tâche"
+          placeholder="Décris-la en une phrase : « chaque matin, résume-moi les nouveautés sur Tauri »"
+          filled={!!(form.name.trim() || form.prompt.trim())}
+          onfill={(f) => { if (form) { if (f.name?.trim()) form.name = f.name.trim(); if (f.prompt?.trim()) form.prompt = f.prompt.trim(); } }}
+        />
+      {/if}
       <label>
         <span>Nom</span>
         <input bind:value={form.name} placeholder="Ex. Revue de presse du matin" autocomplete="off" />
