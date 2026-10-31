@@ -4,6 +4,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), ver
 
 ## [Non publié]
 
+## [0.4.0] - 2026-10-31
+
 ### Ajouté
 - **Navigateur intégré** : un panneau à droite affiche la vraie page web (WebView2) quand Lama cherche ou lit une page, depuis « Navigateur » dans la barre latérale (Ctrl + L pour l'adresse), ou en cliquant un lien d'une réponse (Ctrl + clic : navigateur par défaut). Navigation privée, adresses publiques seulement, téléchargements et autorisations refusés, aucun accès à l'application. Réglable dans Recherche web.
 - Bouton « Voir dans le navigateur » sur les cartes de recherche web.
@@ -106,6 +108,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), ver
 
 - Première version : discussion, projets, agent, coffre de mots de passe, tâches planifiées, profils.
 
-[Non publié]: https://github.com/BattleLicorneUE/Lama-Desktop/compare/v0.2.1...HEAD
+[Non publié]: https://github.com/BattleLicorneUE/Lama-Desktop/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/BattleLicorneUE/Lama-Desktop/compare/v0.3.2...v0.4.0
 [0.2.1]: https://github.com/BattleLicorneUE/Lama-Desktop/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/BattleLicorneUE/Lama-Desktop/releases/tag/v0.2.0
