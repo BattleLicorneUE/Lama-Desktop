@@ -17,4 +17,5 @@
   button { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 4px 10px; color: var(--fg); font: inherit; }
   button.go { background: var(--fg); color: var(--bg); border-color: var(--fg); }
   button.x { border: none; background: none; font-size: 18px; line-height: 1; padding: 0 4px; color: var(--muted); }
+  :global(body[data-pane]) .toast { right: calc(46% + 16px); }
 </style>

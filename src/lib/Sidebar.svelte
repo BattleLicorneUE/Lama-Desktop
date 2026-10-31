@@ -37,7 +37,7 @@
   }
 </script>
 
-<aside>
+<aside aria-label="Conversations">
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected={chat.mode === "chat"} class:on={chat.mode === "chat"} onclick={() => chat.setMode("chat")}>Chat</button>
     <button role="tab" aria-selected={chat.mode === "code"} class:on={chat.mode === "code"} onclick={() => chat.setMode("code")}>Code</button>
@@ -45,12 +45,13 @@
 
   <input class="search" placeholder="Rechercher…" aria-label="Rechercher dans les conversations" bind:value={chat.search} oninput={() => chat.loadConvs()} />
 
-  <nav>
+  <nav aria-label="Navigation">
     <button class="navb" onclick={() => chat.newChat()}><span class="plus">+</span> {chat.mode === "chat" ? "Nouveau" : "Nouvelle session"}</button>
-    <button class="navb" class:on={chat.view === "projects" || chat.view === "project"} onclick={() => chat.showProjects()}><Icon name="folder" size={17} /> Projets</button>
-    <button class="navb" class:on={chat.view === "tasks"} onclick={() => chat.showTasks()}><Icon name="clock" size={17} /> Tâches planifiées</button>
+    <button class="navb" class:on={chat.view === "projects" || chat.view === "project"} aria-current={chat.view === "projects" || chat.view === "project" ? "page" : undefined} onclick={() => chat.showProjects()}><Icon name="folder" size={17} /> Projets</button>
+    <button class="navb" class:on={chat.view === "tasks"} aria-current={chat.view === "tasks" ? "page" : undefined} onclick={() => chat.showTasks()}><Icon name="clock" size={17} /> Tâches planifiées</button>
+    <button class="navb" class:on={!!chat.browser} aria-pressed={!!chat.browser} onclick={() => (chat.browser ? chat.closeBrowser() : chat.openBrowser("https://duckduckgo.com/"))}><Icon name="globe" size={17} /> Navigateur</button>
     {#if chat.mode === "chat"}
-      <button class="navb" class:on={chat.view === "artifacts"} onclick={() => chat.showArtifacts()}><Icon name="book" size={17} /> Artéfacts</button>
+      <button class="navb" class:on={chat.view === "artifacts"} aria-current={chat.view === "artifacts" ? "page" : undefined} onclick={() => chat.showArtifacts()}><Icon name="book" size={17} /> Artéfacts</button>
     {/if}
   </nav>
 
@@ -66,7 +67,7 @@
           onkeydown={(e) => { if (e.key === "Enter") finishRename(c); if (e.key === "Escape") renaming = null; }}
         />
       {:else}
-        <button class="title" onclick={() => chat.open(c)} ondblclick={() => startRename(c)} title={(c.workspace ?? c.title) + " — double-clic pour renommer"}>
+        <button class="title" onclick={() => chat.open(c)} ondblclick={() => startRename(c)} onkeydown={(e) => { if (e.key === "F2") startRename(c); }} aria-current={c.id === chat.activeId && chat.view === "chat" ? "page" : undefined} title={(c.workspace ?? c.title) + " — double-clic ou F2 pour renommer"}>
           {#if chat.isRunning(c.id)}<span class="run" role="img" aria-label="En cours" title="Cette conversation travaille en ce moment"></span>{/if}{c.title}
           {#if c.snippet}<small class="snip">{c.snippet}</small>{:else if c.workspace}<small>{c.workspace.split(/[\\/]/).filter(Boolean).pop()}</small>{/if}
         </button>

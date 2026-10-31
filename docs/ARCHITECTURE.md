@@ -7,6 +7,7 @@ src/                    Interface (SvelteKit, mode SPA)
   lib/*.svelte          Panneaux, messages, réglages, coffre, tutoriel…
   lib/chat.svelte.ts    État des conversations et lancement de l'agent
   lib/artifacts.ts      Aperçus isolés (HTML, SVG, React, Mermaid)
+  lib/BrowserPane.svelte Panneau du navigateur intégré (barre d'adresse, suit la position de la page native)
   lib/markdown.ts       Markdown → HTML nettoyé (DOMPurify)
 src-tauri/src/          Cœur Rust
   lib.rs                Commandes Tauri et état de l'application
@@ -18,6 +19,7 @@ src-tauri/src/          Cœur Rust
   schedules.rs          Tâches planifiées
   backup.rs             Sauvegarde, restauration, effacement
   web.rs                Recherche et lecture web (adresses internes refusées)
+  webpane.rs            Navigateur intégré : webview enfant en navigation privée, sans accès aux commandes
   mcp.rs                Connecteurs MCP
   sync.rs               Verrous qui survivent à un panic
 ```
@@ -30,6 +32,8 @@ src-tauri/src/          Cœur Rust
 - **Web** (`web.rs`) : l'adresse est résolue puis figée avant la requête ; les adresses locales et privées sont refusées, redirections comprises.
 - **Contenu généré** : le Markdown passe par DOMPurify (images externes et `url()` CSS retirés) ; les aperçus tournent dans une iframe `sandbox="allow-scripts"` sans accès à l'application.
 - **Sauvegardes** : les secrets (clé API, jetons) restent dans le coffre Windows et ne sont jamais écrits dans une archive ; `mcp.json` n'est restauré qu'avec accord explicite.
+
+- **Navigateur intégré** (`webpane.rs`) : la page vient d'une origine distante, donc Tauri refuse ses appels aux commandes (la capacité `default` ne déclare aucune adresse `remote`) ; seules les adresses http(s) publiques sont ouvertes (nom d'hôte résolu, `*.localhost` refusé pour qu'une page ne se fasse pas passer pour l'application) ; navigation privée, téléchargements et permissions refusés. Le contenu des pages n'est jamais renvoyé à Lama.
 
 ## Données
 

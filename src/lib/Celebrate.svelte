@@ -55,6 +55,7 @@
 {/if}
 
 <style>
+  :global(body[data-pane]) .wrap { right: calc(46% + 22px); }
   .wrap { position: fixed; right: 22px; bottom: 22px; z-index: 300; pointer-events: none; }
   .toast { pointer-events: auto; display: flex; align-items: center; gap: 14px; width: min(360px, calc(100vw - 44px)); text-align: left; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--surface); color: var(--fg); border-radius: 16px; padding: 14px 16px; box-shadow: 0 18px 44px rgb(0 0 0 / 0.35); overflow: visible; }
   .toast.level { border-color: var(--accent); box-shadow: 0 18px 54px color-mix(in srgb, var(--accent) 40%, rgb(0 0 0 / 0.4)); }

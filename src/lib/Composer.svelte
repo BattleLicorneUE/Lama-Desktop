@@ -161,7 +161,7 @@
       onpaste={onPaste}
       rows="1"
       aria-label="Ton message"
-      placeholder={chat.busy ? "Ajoute une précision : elle sera prise en compte sans interrompre la tâche…" : placeholder || (chat.mode === "chat" ?"Écris un message…  ( / pour les commandes )" : "Décris la tâche…  ( / pour les commandes )")}
+      placeholder={chat.busy ? "Ajoute une précision : elle sera prise en compte sans interrompre la tâche…" : placeholder || (chat.mode === "chat" ?"Écris un message ou / pour les commandes" : "Décris la tâche ou / pour les commandes")}
     ></textarea>
     <div class="row">
       <button class="attach" title={chat.supportsVision || !chat.caps[chat.model] ? "Joindre des fichiers ou images" : "Joindre des fichiers (ce modèle ne lit pas les images)"} aria-label="Joindre" onclick={() => chat.pickFiles()}><Icon name="plus" size={18} /></button>

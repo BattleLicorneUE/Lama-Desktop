@@ -3,7 +3,6 @@
 //! Format de configuration identique à Claude Desktop et Claude Code :
 //! `{ "mcpServers": { nom: { command, args, env } | { "type": "http", "url": …, "headers": … } } }`.
 
-use crate::sync::MutexExt;
 use std::{
     collections::HashMap,
     path::Path,
@@ -428,6 +427,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::sync::MutexExt;
 
     #[test]
     fn secret_references_are_expanded_and_missing_ones_reported() {

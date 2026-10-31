@@ -18,6 +18,18 @@ describe("parcours principal", () => {
   });
 });
 
+describe("accessibilité", () => {
+  it("l'application a une seule zone principale, un titre de page et une navigation nommée", { timeout: 20000 }, async () => {
+    localStorage.setItem("mock.secret", "demo-key");
+    render(Page);
+    await fireEvent.click(await screen.findByRole("button", { name: /Principal/ }, { timeout: 4000 }));
+    await screen.findByLabelText("Ton message", {}, { timeout: 6000 });
+    expect(document.querySelectorAll("main")).toHaveLength(1);
+    expect(document.querySelector("main h1")?.textContent?.trim()).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "Navigation" })).toBeInTheDocument();
+  });
+});
+
 describe("réglages", () => {
   const PAGES = [
     "Mon profil", "Mémoire", "Progression", "Apparence", "Préférences", "Ollama Cloud", "Modèles sur ce PC", "Choisir un modèle", "Recherche web",

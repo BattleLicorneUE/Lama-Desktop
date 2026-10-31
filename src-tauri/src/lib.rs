@@ -1,5 +1,6 @@
 mod agent;
 mod sync;
+mod webpane;
 mod agents;
 mod git;
 mod history;
@@ -2078,6 +2079,7 @@ pub fn run() {
         })
         .invoke_handler({
             let handler: Box<dyn Fn(tauri::ipc::Invoke) -> bool + Send + Sync> = Box::new(tauri::generate_handler![
+            webpane::webpane_open, webpane::webpane_bounds, webpane::webpane_navigate, webpane::webpane_action, webpane::webpane_visible, webpane::webpane_close,
             cloud_models, cloud_test, chat_start, chat_cancel,
             agent_start, agent_inject, agent_approve, agent_undo, mcp_status, mcp_reload, mcp_config_file, mcp_edit_config,
             fs_list, term_run, read_attachment,
