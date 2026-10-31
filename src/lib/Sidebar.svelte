@@ -49,6 +49,7 @@
     <button class="navb" onclick={() => chat.newChat()}><span class="plus">+</span> {chat.mode === "chat" ? "Nouveau" : "Nouvelle session"}</button>
     <button class="navb" class:on={chat.view === "projects" || chat.view === "project"} onclick={() => chat.showProjects()}><Icon name="folder" size={17} /> Projets</button>
     <button class="navb" class:on={chat.view === "tasks"} onclick={() => chat.showTasks()}><Icon name="clock" size={17} /> Tâches planifiées</button>
+    <button class="navb" class:on={!!chat.browser} aria-pressed={!!chat.browser} onclick={() => (chat.browser ? chat.closeBrowser() : chat.openBrowser("https://duckduckgo.com/"))}><Icon name="globe" size={17} /> Navigateur</button>
     {#if chat.mode === "chat"}
       <button class="navb" class:on={chat.view === "artifacts"} onclick={() => chat.showArtifacts()}><Icon name="book" size={17} /> Artéfacts</button>
     {/if}

@@ -339,6 +339,16 @@
             Lama se rabat sur Wikipédia et le dit au modèle. Les résultats sont alors moins larges, surtout pour l'actualité.
           </p>
           <p class="muted">En mode Manuel, Lama te demande ton accord avant de lire une page. Les adresses de ton réseau local sont toujours refusées.</p>
+          <h3>Navigateur intégré</h3>
+          <p class="muted">
+            Un panneau à droite affiche la vraie page web. Il s'ouvre quand Lama cherche ou lit une page, ou depuis « Navigateur » dans la barre latérale.
+            Il est en navigation privée (rien n'est gardé), refuse les téléchargements et n'a aucun accès à tes données ni à Lama : ce que tu y vois n'est pas envoyé au modèle.
+          </p>
+          <label class="check">
+            <input type="checkbox" checked={chat.browserAuto} onchange={(e) => chat.setBrowserAuto(e.currentTarget.checked)} />
+            <span>Ouvrir le navigateur quand Lama cherche, et y afficher les liens des réponses.</span>
+          </label>
+          <p class="muted">Astuce : Ctrl + clic sur un lien l'ouvre dans ton navigateur habituel.</p>
         </section>
 
       {:else if tab === "memory"}

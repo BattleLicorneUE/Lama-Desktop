@@ -13,6 +13,7 @@
   import Message from "$lib/Message.svelte";
   import CodePanel from "$lib/CodePanel.svelte";
   import PreviewPane from "$lib/PreviewPane.svelte";
+  import BrowserPane from "$lib/BrowserPane.svelte";
   import { collectArtifacts } from "$lib/artifacts";
   import TasksPage from "$lib/TasksPage.svelte";
   import Celebrate from "$lib/Celebrate.svelte";
@@ -41,10 +42,27 @@
       showSettings = true;
     }
   });
+  // L'aperçu d'un artefact et le navigateur occupent la même place : le dernier ouvert gagne.
+  $effect(() => {
+    if (chat.preview) chat.browser = null;
+  });
   let dragging = $state(false);
+
+  /** Un lien d'une réponse s'ouvre dans le navigateur intégré ; Ctrl ou Maj + clic l'ouvre dans le navigateur par défaut. */
+  function onLink(e: MouseEvent) {
+    if (!chat.browserAuto || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.shiftKey || e.metaKey) return;
+    const a = (e.target as Element | null)?.closest?.(".md a[href]") as HTMLAnchorElement | null;
+    const href = a?.getAttribute("href") ?? "";
+    if (!/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    chat.openBrowser(href);
+  }
 
   onMount(() => {
     const stops = [chat.init()];
+    window.addEventListener("click", onLink, true);
+    stops.push(() => window.removeEventListener("click", onLink, true));
     // Vérification discrète, un peu après le lancement pour ne pas ralentir le démarrage.
     const later = setTimeout(() => void updater.check(true), 8000);
     stops.push(() => clearTimeout(later));
@@ -206,7 +224,9 @@
 
   {#if chat.pendingApprovals.length}<ApprovalDialog {chat} tool={chat.pendingApprovals[0]} more={chat.pendingApprovals.length - 1} />{/if}
   {#if showTemplates}<TemplateDialog {chat} onclose={() => (showTemplates = false)} />{/if}
-  {#if chat.preview}
+  {#if chat.browser}
+    <BrowserPane url={chat.browser.url} nonce={chat.browser.nonce} onclose={() => chat.closeBrowser()} />
+  {:else if chat.preview}
     <PreviewPane code={chat.preview.code} lang={chat.preview.lang} versions={collectArtifacts(chat.messages)} onselect={(a) => (chat.preview = { code: a.code, lang: a.lang })} onclose={() => (chat.preview = null)} />
   {/if}
   {#if chat.mode === "code" && chat.panelOpen}<CodePanel {chat} />{/if}

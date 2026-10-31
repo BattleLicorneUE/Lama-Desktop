@@ -98,6 +98,9 @@ export function installMock() {
     await wait(200);
     emit("agent:step", { id });
     tool("t1", "read_file", { path: "index.html" }, "done", "    1\t<!doctype html>\n    2\t<title>The Purifier</title>");
+    tool("w1", "web_search", { query: "dégradé radial CSS" }, "running");
+    await wait(300);
+    tool("w1", "web_search", { query: "dégradé radial CSS" }, "done", "1. MDN : radial-gradient()\n   https://developer.mozilla.org/fr/docs/Web/CSS/gradient/radial-gradient");
     await wait(400);
     const diff = "--- a/style.css\n+++ b/style.css\n@@ -1,3 +1,4 @@\n body {\n-  background: #777;\n+  background: radial-gradient(#1a1a2e, #0b0b14);\n+  color: #f4e9c8;\n }";
     tool("t2", "edit_file", { path: "style.css" }, "awaiting", null as any, diff);

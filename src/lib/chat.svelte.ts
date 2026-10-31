@@ -1,3 +1,4 @@
+import { urlForTool } from "$lib/browser";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -347,6 +348,26 @@ export class ChatStore {
   pending = $state<Attachment[]>([]);
   /** Aperçu d'artefact (bloc html/svg) ouvert à droite. */
   preview = $state<{ code: string; lang: string } | null>(null);
+  /** Navigateur intégré (panneau de droite) : page affichée ; `nonce` change à chaque demande pour relancer la navigation. */
+  browser = $state<{ url: string; nonce: number } | null>(null);
+  /** Ouvre le navigateur tout seul quand Lama cherche ou lit une page, et affiche dedans les liens des réponses. */
+  browserAuto = $state(load("browserAuto", "1") === "1");
+  private browsed = new Set<string>();
+
+  setBrowserAuto(v: boolean) {
+    this.browserAuto = v;
+    save("browserAuto", v ? "1" : "0");
+  }
+
+  /** Affiche une page dans le navigateur intégré (il remplace l'aperçu d'artefact, qui occupe la même place). */
+  openBrowser(url: string) {
+    this.preview = null;
+    this.browser = { url, nonce: (this.browser?.nonce ?? 0) + 1 };
+  }
+
+  closeBrowser() {
+    this.browser = null;
+  }
   /** Capacités des modèles (`tools`, `vision`…), chargées à la demande. */
   caps = $state<Record<string, string[]>>({});
   ctxInfo = $state<Record<string, CtxInfo>>({});
@@ -1472,6 +1493,14 @@ export class ChatStore {
         if (ev.state === "awaiting") this.alert(s === this.fg ? "Autorisation requise" : `Autorisation requise : ${this.titleOf(s)}`, `${ev.name} ${String(ev.args.path ?? ev.args.command ?? ev.args.to ?? "")}`);
         if (i >= 0) last.tools[i] = ev;
         else last.tools.push(ev);
+        // Quand Lama cherche ou lit une page, on la montre : une seule fois par appel, et jamais pour une action refusée.
+        if (this.browserAuto && s === this.fg && (ev.state === "running" || ev.state === "done") && !this.browsed.has(ev.call_id)) {
+          const page = urlForTool(ev.name, ev.args);
+          if (page) {
+            this.browsed.add(ev.call_id);
+            this.openBrowser(page);
+          }
+        }
         this.autosave(s);
         if (s === this.fg) await this.scrollDown();
       }),
@@ -1621,6 +1650,7 @@ export class ChatStore {
     this.detach();
     this.pending = [];
     this.preview = null;
+    this.browser = null;
     this.chatProject = this.activeProject;
     if (this.mode === "chat") this.workspace = "";
   }
@@ -2031,6 +2061,7 @@ export class ChatStore {
     const s = this.fg;
     this.pending = [];
     this.preview = null;
+    this.browser = null;
     this.workspace = c.workspace ?? "";
     this.chatProject = c.project_id;
     this.loadSkills();
