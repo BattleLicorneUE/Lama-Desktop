@@ -139,11 +139,15 @@
   const SHORTCUTS = [
     ["Ctrl + N", "Nouvelle conversation"],
     ["Ctrl + K", "Chercher une conversation"],
+    ["Ctrl + B", "Afficher ou masquer la barre latérale"],
+    ["Ctrl + L", "Navigateur : saisir une adresse ou une recherche"],
     ["Ctrl + M", "Gérer les modèles"],
     ["Ctrl + ,", "Ouvrir les réglages"],
     ["/", "Commandes et skills"],
     ["Entrée", "Envoyer"],
     ["Maj + Entrée", "Aller à la ligne"],
+    ["F2", "Renommer la conversation sélectionnée dans la liste"],
+    ["Échap", "Fermer la fenêtre ou le menu ouvert"],
   ];
 
   onMount(async () => {
@@ -187,13 +191,13 @@
     {/if}
   </nav>
 
-  <main>
+  <div class="content">
     <button class="x" onclick={onclose} aria-label="Fermer les réglages"><Icon name="close" size={20} /></button>
     <div class="page">
-      <header class="ph">
+      <div class="ph">
         <h2>{PAGES[tab].title}</h2>
         <p>{PAGES[tab].intro}</p>
-      </header>
+      </div>
       {#if msg}<p class="msg">{msg}</p>{/if}
 
       {#if tab === "appearance"}
@@ -415,7 +419,7 @@
         <UpdatePanel {chat} />
       {/if}
     </div>
-  </main>
+  </div>
 </div>
 
 <style>
@@ -428,7 +432,7 @@
   nav button:hover, nav button.on { background: var(--hover); }
   nav button.on { font-weight: 600; }
   nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  main { position: relative; overflow-y: auto; }
+  .content { position: relative; overflow-y: auto; }
   .page { max-width: 780px; margin: 0 auto; padding: 44px 32px 60px; display: flex; flex-direction: column; gap: 30px; }
   .x { position: absolute; top: 14px; right: 18px; display: grid; place-items: center; width: 34px; height: 34px; border: 0; background: none; color: var(--fg); border-radius: 8px; }
   .x:hover { background: var(--hover); }

@@ -362,11 +362,38 @@ export class ChatStore {
   /** Affiche une page dans le navigateur intégré (il remplace l'aperçu d'artefact, qui occupe la même place). */
   openBrowser(url: string) {
     this.preview = null;
+    this.makeRoom();
     this.browser = { url, nonce: (this.browser?.nonce ?? 0) + 1 };
   }
 
   closeBrowser() {
     this.browser = null;
+    this.giveRoomBack();
+  }
+
+  /** Ce qu'on a replié pour faire de la place au navigateur (le panneau du mode Code, la barre latérale) : on le rouvre à sa fermeture. */
+  private folded: { panel: boolean; sidebar: boolean } | null = null;
+
+  /** Le navigateur prend 46 % de la fenêtre : la conversation garde au moins ~400 px, quitte à replier le panneau de droite ou la barre latérale. */
+  private makeRoom() {
+    if (this.folded) return;
+    const folded = { panel: false, sidebar: false };
+    if (this.mode === "code" && this.panelOpen) {
+      this.panelOpen = false;
+      folded.panel = true;
+    }
+    if (this.sidebarOpen && window.innerWidth * 0.54 - 272 < 400) {
+      this.sidebarOpen = false;
+      folded.sidebar = true;
+    }
+    this.folded = folded;
+  }
+
+  private giveRoomBack() {
+    const f = this.folded;
+    this.folded = null;
+    if (f?.panel) this.panelOpen = true;
+    if (f?.sidebar) this.sidebarOpen = true;
   }
   /** Capacités des modèles (`tools`, `vision`…), chargées à la demande. */
   caps = $state<Record<string, string[]>>({});
@@ -1650,7 +1677,7 @@ export class ChatStore {
     this.detach();
     this.pending = [];
     this.preview = null;
-    this.browser = null;
+    this.closeBrowser();
     this.chatProject = this.activeProject;
     if (this.mode === "chat") this.workspace = "";
   }
@@ -2061,7 +2088,7 @@ export class ChatStore {
     const s = this.fg;
     this.pending = [];
     this.preview = null;
-    this.browser = null;
+    this.closeBrowser();
     this.workspace = c.workspace ?? "";
     this.chatProject = c.project_id;
     this.loadSkills();

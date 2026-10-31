@@ -186,7 +186,7 @@
     {#if settled.length}
       <button class="fold" onclick={() => (showAll = !showAll)} aria-expanded={showAll}>
         <span class="chev" class:open={showAll}><Icon name="chevron" size={14} /></span>
-        <span class="txt">{stats.text}</span>
+        <span class="txt" title={stats.text}>{stats.text}</span>
         {#if stats.errors}<span class="errs">{plural(stats.errors, "erreur")}</span>{/if}
         {#if stats.add || stats.del}
           <span class="diffstat">{#if stats.add}<b class="plus">+{stats.add}</b>{/if}{#if stats.del}<b class="minus">−{stats.del}</b>{/if}</span>

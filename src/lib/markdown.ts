@@ -74,7 +74,7 @@ export function renderMarkdown(src: string): string {
 
 let highlighter: Promise<Highlighter> | undefined;
 function getHighlighter() {
-  highlighter ??= createHighlighter({ themes: ["github-light", "github-dark"], langs: LANGS });
+  highlighter ??= createHighlighter({ themes: ["github-light-default", "github-dark"], langs: LANGS });
   return highlighter;
 }
 
@@ -99,7 +99,7 @@ export function enhance(node: HTMLElement, params: EnhanceParams) {
         const tmp = document.createElement("div");
         tmp.innerHTML = hl.codeToHtml(text, {
           lang,
-          themes: { light: "github-light", dark: "github-dark" },
+          themes: { light: "github-light-default", dark: "github-dark" },
           defaultColor: false,
         });
         const shiki = tmp.querySelector("pre");

@@ -3,7 +3,8 @@
   --sidebar: #f0eee6;
   --surface: #ffffff;
   --fg: #141413;
-  --muted: #73726c;
+  /* Gris assombri : 4,7 de contraste même sur le fond de la barre latérale (4,2 avec l'ancien #73726c). */
+  --muted: #66655f;
   --border: #e5e3da;
   --hover: #e8e6dc;
   --user: #f0eee6;
@@ -128,7 +129,7 @@ button:not(:disabled):active { transform: scale(0.96); }
 .md code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 0.88em; }
 .md :not(pre) > code { background: var(--code); padding: 2px 6px; border-radius: 5px; }
 .md .math { overflow-x: auto; margin: 0.7em 0; }
-.md pre .copy { position: absolute; top: 8px; right: 8px; padding: 3px 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); opacity: 0.55; }
+.md pre .copy { position: absolute; top: 8px; right: 8px; padding: 3px 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); opacity: 0.8; }
 .md pre .copy.preview { right: 70px; }
 .md pre:hover .copy, .md pre .copy:focus-visible { opacity: 1; }
 .md table { border-collapse: collapse; }
@@ -138,3 +139,6 @@ button:not(:disabled):active { transform: scale(0.96); }
 .md .shiki span { color: var(--shiki-light); }
 :root[data-theme="dark"] .md .shiki span { color: var(--shiki-dark); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .md .shiki span { color: var(--shiki-dark); } }
+
+/* Texte réservé aux lecteurs d'écran. */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { ChatStore, ToolEvent } from "$lib/chat.svelte";
   import { toolLabel } from "$lib/tool-labels";
+  import { urlForTool } from "$lib/browser";
 
-  let { tool }: { tool: ToolEvent; chat?: ChatStore } = $props();
+  let { tool, chat }: { tool: ToolEvent; chat?: ChatStore } = $props();
+  const page = $derived(urlForTool(tool.name, tool.args));
 
   const STATES: Record<string, string> = {
     awaiting: "En attente", running: "En cours", done: "Terminé", error: "Erreur", denied: "Refusé", undone: "Annulé",
@@ -40,6 +42,7 @@
         <pre class="diff">{#each diffLines as l}<span class:add={l.startsWith("+") && !l.startsWith("+++")} class:del={l.startsWith("-") && !l.startsWith("---")} class:hunk={l.startsWith("@@")}>{l}
 </span>{/each}</pre>
       {/if}
+      {#if page && chat && !ask}<p class="note"><button class="linkbtn" onclick={() => chat.openBrowser(page)}>Voir dans le navigateur</button></p>{/if}
       {#if tool.output && !ask}<pre class="out">{tool.output}</pre>{/if}
     </div>
   {/if}
@@ -70,5 +73,6 @@
   .diff .add { background: var(--add-bg); color: var(--add); }
   .diff .del { background: var(--del-bg); color: var(--del); }
   .diff .hunk { color: var(--muted); }
+  .linkbtn { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; font: inherit; }
   .wait { margin: 0; padding: 6px 12px 8px; color: var(--accent); font-size: 13px; }
 </style>

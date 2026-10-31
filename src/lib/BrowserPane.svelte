@@ -5,7 +5,7 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { onDestroy, onMount, untrack } from "svelte";
   import Icon from "$lib/Icon.svelte";
-  import { searchUrl, toAddress } from "$lib/browser";
+  import { pretty, searchUrl, toAddress } from "$lib/browser";
 
   let { url, nonce, onclose }: { url: string; nonce: number; onclose: () => void } = $props();
 
@@ -75,14 +75,15 @@
   onMount(() => {
     // La page native passe devant l'interface : les notifications se décalent pour rester visibles (voir UpdateToast et Celebrate).
     document.body.dataset.pane = "right";
-    shown = address = url;
+    shown = url;
+    address = pretty(url);
     void open(url);
     const un = listen<{ window: string; url?: string | null; title?: string | null; loading?: boolean | null }>("webpane:nav", (e) => {
       const p = e.payload;
       if (p.window !== owner) return;
       if (p.url) {
         shown = p.url;
-        if (!editing) address = p.url;
+        if (!editing) address = pretty(p.url);
       }
       if (p.title != null) title = p.title;
       if (p.loading != null) loading = p.loading;
@@ -116,7 +117,8 @@
   $effect(() => {
     if (nonce !== lastNonce) {
       lastNonce = nonce;
-      shown = address = url;
+      shown = url;
+      address = pretty(url);
       void go(url);
     }
   });
@@ -138,7 +140,7 @@
         }}
         onblur={() => {
           editing = false;
-          address = shown;
+          address = pretty(shown);
         }}
         spellcheck="false"
         autocomplete="off"
@@ -161,7 +163,7 @@
       <p class="wait">{title || "Chargement…"}</p>
     {/if}
   </div>
-  <p class="foot" title={title}>{title || shown}</p>
+  <p class="foot" title={pretty(shown)}>{title || pretty(shown)}</p>
 </aside>
 
 <style>

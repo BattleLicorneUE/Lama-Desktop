@@ -25,3 +25,12 @@ export function urlForTool(name: string, args: Record<string, unknown>): string 
   }
   return null;
 }
+
+/** Adresse lisible pour la barre : « d%C3%A9grad%C3%A9 » devient « dégradé ». Ne sert qu'à l'affichage. */
+export function pretty(url: string): string {
+  try {
+    return decodeURI(url);
+  } catch {
+    return url;
+  }
+}

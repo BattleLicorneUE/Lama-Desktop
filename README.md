@@ -14,7 +14,7 @@ Application de bureau pour Windows qui sert de poste de travail avec les modèle
 - Conversations avec les modèles d'Ollama Cloud, réponses affichées au fur et à mesure.
 - Modèle par défaut : `beam`. Un guide classe les modèles par usage et par prix pour aider à choisir.
 - Markdown, code coloré, formules mathématiques, images et fichiers joints.
-- Recherche sur le web activée par défaut.
+- Recherche sur le web activée par défaut, avec un **navigateur intégré** qui montre la page que Lama cherche ou lit (navigation privée, sans accès à tes données).
 - Mode « réflexion » repliable pour les modèles qui l'offrent.
 
 ### Projets

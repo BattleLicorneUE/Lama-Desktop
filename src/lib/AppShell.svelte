@@ -44,7 +44,7 @@
   });
   // L'aperçu d'un artefact et le navigateur occupent la même place : le dernier ouvert gagne.
   $effect(() => {
-    if (chat.preview) chat.browser = null;
+    if (chat.preview && chat.browser) chat.closeBrowser();
   });
   let dragging = $state(false);
 
@@ -88,7 +88,10 @@
     else if (k === "m") showModels = true;
     else if (k === ",") showSettings = true;
     else if (k === "b") chat.toggleSidebar();
-    else return;
+    else if (k === "l") {
+      if (!chat.browser) chat.openBrowser("https://duckduckgo.com/");
+      setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label="Adresse ou recherche"]')?.focus(), chat.browser ? 0 : 200);
+    } else return;
     e.preventDefault();
   }
 
@@ -138,7 +141,8 @@
     <Sidebar {chat} {profile} {onswitch} onmodels={() => (showModels = true)} onsettings={() => (showSettings = true)} />
   {/if}
 
-  <section class="main">
+  <main class="main">
+    <h1 class="sr-only">{chat.view === "projects" ? "Projets" : chat.view === "tasks" ? "Tâches planifiées" : chat.view === "artifacts" ? "Artéfacts" : (chat.convs.find((c) => c.id === chat.activeId)?.title ?? "Nouvelle conversation")}</h1>
     <button class="fold left" onclick={() => chat.toggleSidebar()} title="Barre latérale (Ctrl+B)" aria-label="Afficher ou masquer la barre latérale" aria-pressed={chat.sidebarOpen}>
       <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M8 3.5v13" stroke="currentColor" stroke-width="1.5" /></svg>
     </button>
@@ -220,7 +224,7 @@
       </div>
       <div class="dock"><div class="box"><Composer {chat} /></div></div>
     {/if}
-  </section>
+  </main>
 
   {#if chat.pendingApprovals.length}<ApprovalDialog {chat} tool={chat.pendingApprovals[0]} more={chat.pendingApprovals.length - 1} />{/if}
   {#if showTemplates}<TemplateDialog {chat} onclose={() => (showTemplates = false)} />{/if}

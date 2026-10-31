@@ -2,6 +2,18 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions numérotées selon [SemVer](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Ajouté
+- **Navigateur intégré** : un panneau à droite affiche la vraie page web (WebView2) quand Lama cherche ou lit une page, depuis « Navigateur » dans la barre latérale (Ctrl + L pour l'adresse), ou en cliquant un lien d'une réponse (Ctrl + clic : navigateur par défaut). Navigation privée, adresses publiques seulement, téléchargements et autorisations refusés, aucun accès à l'application. Réglable dans Recherche web.
+- Bouton « Voir dans le navigateur » sur les cartes de recherche web.
+- Raccourcis : Ctrl + L, F2 (renommer une conversation au clavier) ; la liste des raccourcis des réglages est complète.
+
+### Modifié
+- Accessibilité : zone principale et titre de page pour les lecteurs d'écran, navigation nommée, page courante annoncée, contrastes du texte atténué et de la coloration du code relevés (WCAG AA), plus de zone principale en double dans les réglages.
+- Le navigateur replie le panneau du mode Code ou la barre latérale si la fenêtre est trop étroite, et les rend à sa fermeture ; les notifications se décalent pour rester visibles.
+- Zone de saisie : texte d'aide plus court (plus de retour à la ligne quand le panneau est ouvert).
+
 ## [0.3.2] - 2026-10-28
 
 ### Ajouté

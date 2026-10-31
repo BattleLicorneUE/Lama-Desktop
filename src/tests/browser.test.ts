@@ -42,6 +42,27 @@ describe("navigateur intégré", () => {
     expect(new ChatStore("t").browserAuto).toBe(false);
   });
 
+  it("fait de la place à la conversation, puis rend ce qu'il a replié", () => {
+    const chat = new ChatStore("t");
+    chat.mode = "code";
+    chat.panelOpen = true;
+    chat.sidebarOpen = true;
+    const wide = window.innerWidth;
+    window.innerWidth = 1000;
+    chat.openBrowser("https://example.org/");
+    expect(chat.panelOpen).toBe(false);
+    expect(chat.sidebarOpen).toBe(false);
+    chat.openBrowser("https://example.org/b"); // une deuxième page ne replie rien de plus
+    chat.closeBrowser();
+    expect(chat.panelOpen).toBe(true);
+    expect(chat.sidebarOpen).toBe(true);
+    window.innerWidth = 1600;
+    chat.openBrowser("https://example.org/");
+    expect(chat.sidebarOpen).toBe(true); // assez large : la barre latérale reste
+    chat.closeBrowser();
+    window.innerWidth = wide;
+  });
+
   it("le panneau a une barre d'adresse, des boutons nommés et affiche l'erreur du cœur", async () => {
     render(BrowserPane, { url: "https://example.org/", nonce: 1, onclose: () => {} });
     for (const name of ["Page précédente", "Page suivante", "Ouvrir dans le navigateur par défaut", "Fermer le navigateur"]) {
