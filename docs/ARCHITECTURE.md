@@ -5,13 +5,16 @@ Lama Desktop est une application **Tauri 2** : un cœur en **Rust** (`src-tauri/
 ```
 src/                    Interface (SvelteKit, mode SPA)
   lib/*.svelte          Panneaux, messages, réglages, coffre, tutoriel…
-  lib/chat.svelte.ts    État des conversations et lancement de l'agent
+  lib/chat.svelte.ts    Magasin de conversations (ChatStore) ; chat-types.ts (types, constantes, petites fonctions),
+                        chat-storage.ts (réglages par profil), chat-session.svelte.ts, chat-events.ts (événements du cœur Rust)
   lib/artifacts.ts      Aperçus isolés (HTML, SVG, React, Mermaid)
   lib/BrowserPane.svelte Panneau du navigateur intégré (barre d'adresse, suit la position de la page native)
   lib/markdown.ts       Markdown → HTML nettoyé (DOMPurify)
 src-tauri/src/          Cœur Rust
-  lib.rs                Commandes Tauri et état de l'application
-  agent/                Boucle de l'agent, outils, règles d'approbation, bac à sable
+  lib.rs                État partagé, fonctions communes et démarrage (`run`)
+  commands/             Commandes Tauri par domaine (chat, history, skills, vault, data, workspace…)
+  agent/                Boucle de l'agent (mod.rs), appels d'outils (calls.rs), outils « méta » (meta.rs),
+                        définitions (definitions.rs), prompt (prompt.rs), approbation (approval.rs), bac à sable
   vault.rs              Coffre chiffré (Argon2id + XChaCha20-Poly1305)
   browser.rs            Navigateur piloté par le protocole Chrome DevTools
   winio.rs              Saisie clavier et presse-papiers Windows

@@ -4,6 +4,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), ver
 
 ## [Non publié]
 
+### Modifié
+- Code : `lib.rs` (2137 → 582 lignes), `agent/mod.rs` (1893 → 449) et `chat.svelte.ts` (2127 → 1716) sont découpés en modules, sans changement de comportement ; les commandes Tauri sont rangées dans `src-tauri/src/commands/` par domaine.
+
 ## [0.4.0] - 2026-10-31
 
 ### Ajouté
